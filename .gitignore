@@ -1,0 +1,35 @@
+# Virtual Environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# PyInstaller Build Artifacts
+build/
+dist/
+*.spec.bak
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS Generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+
+# Local Logs & Env
+*.log
+.env
+.env.local

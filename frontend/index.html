@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager • Process Controller & SJF Throttler</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Top App Navigation / Header -->
+        <header class="app-header">
+            <div class="brand-section">
+                <div class="brand-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div>
+                    <div class="brand-title-row">
+                        <h1>Process Controller</h1>
+                        <span class="badge badge-privacy" title="Client IP masked to 127.0.0.1 and tracking headers scrubbed">🛡️ IP Masked</span>
+                        <span class="badge badge-live"><span class="pulse-dot"></span> LIVE</span>
+                    </div>
+                    <p class="subtitle">Windows Task Manager & SJF CPU Throttler</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <button id="autoBtn" class="btn btn-auto" onclick="toggleAuto()">
+                    <span class="btn-indicator"></span>
+                    <span id="autoBtnText">Auto-Schedule: OFF</span>
+                </button>
+                <button class="btn btn-danger" onclick="resumeAll()">Resume All Normal</button>
+            </div>
+        </header>
+
+        <!-- Real-Time Task Manager Performance Dashboard -->
+        <section class="performance-section">
+            <!-- CPU Performance Card -->
+            <div class="perf-card perf-cpu">
+                <div class="perf-card-header">
+                    <div class="perf-title-group">
+                        <span class="perf-badge badge-cpu">CPU</span>
+                        <span class="perf-name">Processor Utilization</span>
+                    </div>
+                    <div class="perf-value-group">
+                        <span id="cpuPercentVal" class="perf-main-val">0.0%</span>
+                        <span id="cpuSubVal" class="perf-sub-val">-- cores</span>
+                    </div>
+                </div>
+                <div class="graph-wrapper">
+                    <canvas id="cpuGraphCanvas" width="460" height="96"></canvas>
+                    <div class="graph-axis-grid">
+                        <span>100%</span>
+                        <span>50%</span>
+                        <span>0%</span>
+                    </div>
+                </div>
+                <div class="perf-footer">
+                    <span>60 Seconds History</span>
+                    <span id="cpuThreadsVal">Real-time sampling</span>
+                </div>
+            </div>
+
+            <!-- Memory Performance Card -->
+            <div class="perf-card perf-mem">
+                <div class="perf-card-header">
+                    <div class="perf-title-group">
+                        <span class="perf-badge badge-mem">Memory</span>
+                        <span class="perf-name">RAM Utilization</span>
+                    </div>
+                    <div class="perf-value-group">
+                        <span id="memPercentVal" class="perf-main-val">0.0%</span>
+                        <span id="memSubVal" class="perf-sub-val">0 / 0 GB</span>
+                    </div>
+                </div>
+                <div class="graph-wrapper">
+                    <canvas id="memGraphCanvas" width="460" height="96"></canvas>
+                    <div class="graph-axis-grid">
+                        <span>100%</span>
+                        <span>50%</span>
+                        <span>0%</span>
+                    </div>
+                </div>
+                <div class="perf-footer">
+                    <span>In-Use Committed Memory</span>
+                    <span id="memThrottlingVal">SJF Threshold: 350 MB</span>
+                </div>
+            </div>
+
+            <!-- System Overview / Mode Status Card -->
+            <div class="perf-card perf-summary">
+                <div class="summary-top">
+                    <span class="summary-label">System State & Metrics</span>
+                    <span id="statusBannerPill" class="status-pill status-pill-manual">Manual Mode</span>
+                </div>
+                
+                <div class="summary-stat-grid">
+                    <div class="stat-box">
+                        <span class="stat-number" id="statTotalProc">0</span>
+                        <span class="stat-caption">Total Tasks</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-number stat-ext" id="statExternalProc">0</span>
+                        <span class="stat-caption">External Apps</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-number stat-sys" id="statSystemProc">0</span>
+                        <span class="stat-caption">System Apps</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-number stat-sjf" id="statHeavyProc">0</span>
+                        <span class="stat-caption">Heavy (>350M)</span>
+                    </div>
+                </div>
+
+                <div id="statusBanner" class="status-description">
+                    Scanning running processes and CPU usage...
+                </div>
+            </div>
+        </section>
+
+        <!-- Compact Search & Filtering Toolbar -->
+        <div class="toolbar">
+            <div class="search-box">
+                <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="searchInput" class="search-input"
+                    placeholder="Search by Process Name or PID (e.g. chrome, python, 4520)..." oninput="handleSearch()" />
+                <button id="clearSearchBtn" class="btn-clear" onclick="clearSearch()" style="display: none;">✕</button>
+            </div>
+
+            <div class="filter-pills">
+                <button class="pill-btn active" data-filter="all" onclick="setQuickFilter('all')">All (<span id="matchedCount">0</span>)</button>
+                <button class="pill-btn" data-filter="external" onclick="setQuickFilter('external')">External Apps (<span id="externalCount">0</span>)</button>
+                <button class="pill-btn" data-filter="heavy" onclick="setQuickFilter('heavy')">Heavy Tasks</button>
+                <button class="pill-btn" data-filter="suspended" onclick="setQuickFilter('suspended')">Suspended</button>
+            </div>
+        </div>
+
+        <!-- Task Manager Compact Process Grid -->
+        <main class="split-grid">
+            <!-- Left Panel: External Apps -->
+            <section class="column-card column-external">
+                <div class="column-header">
+                    <div class="column-title">
+                        <h2>Externally Installed & User Apps</h2>
+                        <span id="externalSectionCount" class="count-badge count-external">0</span>
+                    </div>
+                    <span class="column-hint">Focus or terminate non-critical user software</span>
+                </div>
+                <div class="table-container">
+                    <table class="tm-table">
+                        <thead>
+                            <tr>
+                                <th class="col-pid" onclick="sortTable('pid')">PID <span class="sort-icon" id="sort-pid">▲</span></th>
+                                <th class="col-name" onclick="sortTable('name')">Name <span class="sort-icon" id="sort-name"></span></th>
+                                <th class="col-mem" onclick="sortTable('memory_mb')">Memory (MB) <span class="sort-icon" id="sort-mem"></span></th>
+                                <th class="col-class">Class</th>
+                                <th class="col-status">Status</th>
+                                <th class="col-action">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="externalAppsBody"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Right Panel: System Background Tasks -->
+            <section class="column-card column-system">
+                <div class="column-header">
+                    <div class="column-title">
+                        <h2>System & OS Background Tasks</h2>
+                        <span id="systemSectionCount" class="count-badge count-system">0</span>
+                    </div>
+                    <span class="column-hint">Protected Windows services and system hosts</span>
+                </div>
+                <div class="table-container">
+                    <table class="tm-table">
+                        <thead>
+                            <tr>
+                                <th class="col-pid" onclick="sortTable('pid')">PID <span class="sort-icon" id="sort-sys-pid">▲</span></th>
+                                <th class="col-name" onclick="sortTable('name')">Name <span class="sort-icon" id="sort-sys-name"></span></th>
+                                <th class="col-mem" onclick="sortTable('memory_mb')">Memory (MB) <span class="sort-icon" id="sort-sys-mem"></span></th>
+                                <th class="col-class">Class</th>
+                                <th class="col-status">Status</th>
+                                <th class="col-action">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="systemAppsBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

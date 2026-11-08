@@ -1,0 +1,842 @@
+/* ==========================================================================
+   Task Manager Theme: White, Green & Orange
+   High-density, impactful Windows Task Manager design
+   ========================================================================== */
+
+:root {
+    /* Base Colors */
+    --bg-app: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-card-subtle: #f1f5f9;
+    --border-color: #e2e8f0;
+    --border-strong: #cbd5e1;
+
+    /* Text Colors */
+    --text-primary: #0f172a;
+    --text-secondary: #334155;
+    --text-muted: #64748b;
+    --text-faint: #94a3b8;
+
+    /* Green Palette (Primary, CPU, Safe/Short Tasks, Active Auto) */
+    --green-50: #f0fdf4;
+    --green-100: #dcfce7;
+    --green-200: #bbf7d0;
+    --green-500: #22c55e;
+    --green-600: #16a34a;
+    --green-700: #15803d;
+    --green-800: #166534;
+
+    /* Orange Palette (Memory, Heavy Tasks, Warnings, Focused Task) */
+    --orange-50: #fff7ed;
+    --orange-100: #ffedd5;
+    --orange-200: #fed7aa;
+    --orange-500: #f97316;
+    --orange-600: #ea580c;
+    --orange-700: #c2410c;
+    --orange-800: #9a3412;
+
+    /* Red / Danger (End Task) */
+    --red-50: #fef2f2;
+    --red-600: #dc2626;
+    --red-700: #b91c1c;
+
+    /* Shadows & Radii */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 10px;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    padding: 16px 20px;
+    -webkit-font-smoothing: antialiased;
+}
+
+.app-container {
+    max-width: 1680px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+/* ==========================================================================
+   Header & Action Bar
+   ========================================================================== */
+.app-header {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+}
+
+.brand-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.brand-icon {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, var(--green-600), var(--orange-600));
+    color: #ffffff;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+}
+
+.brand-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brand-title-row h1 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.3px;
+}
+
+.subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.badge-privacy {
+    background: var(--green-50);
+    color: var(--green-700);
+    border: 1px solid var(--green-200);
+}
+
+.badge-live {
+    background: var(--orange-50);
+    color: var(--orange-700);
+    border: 1px solid var(--orange-200);
+}
+
+.pulse-dot {
+    width: 6px;
+    height: 6px;
+    background-color: var(--orange-500);
+    border-radius: 50%;
+    display: inline-block;
+    animation: livePulse 1.8s infinite ease-in-out;
+}
+
+@keyframes livePulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.3; transform: scale(0.8); }
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Button Styles */
+.btn {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-strong);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+    background: var(--bg-card-subtle);
+    border-color: var(--text-faint);
+}
+
+.btn-auto {
+    background: var(--green-50);
+    color: var(--green-700);
+    border-color: var(--green-200);
+}
+
+.btn-auto:hover:not(:disabled) {
+    background: var(--green-100);
+    border-color: var(--green-500);
+}
+
+.btn-auto.active {
+    background: var(--green-600);
+    color: #ffffff;
+    border-color: var(--green-700);
+    box-shadow: 0 2px 5px rgba(22, 163, 74, 0.3);
+}
+
+.btn-auto .btn-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green-600);
+    display: inline-block;
+}
+
+.btn-auto.active .btn-indicator {
+    background: #ffffff;
+}
+
+.btn-danger {
+    background: var(--orange-50);
+    color: var(--orange-700);
+    border-color: var(--orange-200);
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: var(--orange-600);
+    color: #ffffff;
+    border-color: var(--orange-700);
+}
+
+/* ==========================================================================
+   Real-Time Task Manager Performance Dashboard (CPU, RAM, System Stats)
+   ========================================================================== */
+.performance-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.1fr;
+    gap: 12px;
+}
+
+@media (max-width: 1100px) {
+    .performance-section {
+        grid-template-columns: 1fr;
+    }
+}
+
+.perf-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 12px 14px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.perf-card.perf-cpu {
+    border-top: 3px solid var(--green-600);
+}
+
+.perf-card.perf-mem {
+    border-top: 3px solid var(--orange-600);
+}
+
+.perf-card.perf-summary {
+    border-top: 3px solid #3b82f6;
+}
+
+.perf-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
+
+.perf-title-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.perf-badge {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 1px 6px;
+    border-radius: var(--radius-sm);
+    letter-spacing: 0.4px;
+}
+
+.badge-cpu {
+    background: var(--green-100);
+    color: var(--green-700);
+}
+
+.badge-mem {
+    background: var(--orange-100);
+    color: var(--orange-700);
+}
+
+.perf-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.perf-value-group {
+    text-align: right;
+}
+
+.perf-main-val {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: ui-monospace, SFMono-Regular, "Segoe UI Monospace", Consolas, monospace;
+    display: block;
+    line-height: 1.1;
+}
+
+.perf-cpu .perf-main-val {
+    color: var(--green-600);
+}
+
+.perf-mem .perf-main-val {
+    color: var(--orange-600);
+}
+
+.perf-sub-val {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+/* Canvas Graph Wrapper */
+.graph-wrapper {
+    position: relative;
+    width: 100%;
+    height: 84px;
+    background: #fbfdff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    overflow: hidden;
+}
+
+.graph-wrapper canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.graph-axis-grid {
+    position: absolute;
+    right: 4px;
+    top: 2px;
+    bottom: 2px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+    font-size: 9px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    color: var(--text-faint);
+    text-shadow: 0 0 2px #ffffff;
+}
+
+.perf-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+/* Summary Card */
+.summary-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.summary-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.status-pill {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 9999px;
+}
+
+.status-pill-manual {
+    background: var(--bg-card-subtle);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+}
+
+.status-pill-auto {
+    background: var(--green-100);
+    color: var(--green-800);
+    border: 1px solid var(--green-500);
+}
+
+.status-pill-focus {
+    background: var(--orange-100);
+    color: var(--orange-800);
+    border: 1px solid var(--orange-500);
+}
+
+.summary-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.stat-box {
+    background: var(--bg-card-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 16px;
+    font-weight: 800;
+    display: block;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    line-height: 1.1;
+    color: var(--text-primary);
+}
+
+.stat-number.stat-ext {
+    color: var(--orange-600);
+}
+
+.stat-number.stat-sys {
+    color: var(--text-secondary);
+}
+
+.stat-number.stat-sjf {
+    color: var(--green-600);
+}
+
+.stat-caption {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-description {
+    background: var(--bg-card-subtle);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    min-height: 28px;
+    display: flex;
+    align-items: center;
+}
+
+/* ==========================================================================
+   Toolbar (Search & Quick Filter Pills)
+   ========================================================================== */
+.toolbar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.search-box {
+    position: relative;
+    flex: 1;
+    max-width: 480px;
+    display: flex;
+    align-items: center;
+}
+
+.search-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.search-input {
+    width: 100%;
+    padding: 6px 30px 6px 32px;
+    font-size: 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    color: var(--text-primary);
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.search-input:focus {
+    border-color: var(--green-600);
+    box-shadow: 0 0 0 2px var(--green-100);
+}
+
+.btn-clear {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 4px;
+}
+
+.filter-pills {
+    display: flex;
+    gap: 6px;
+}
+
+.pill-btn {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.pill-btn:hover {
+    background: var(--bg-card-subtle);
+}
+
+.pill-btn.active {
+    background: var(--orange-600);
+    color: #ffffff;
+    border-color: var(--orange-700);
+}
+
+/* ==========================================================================
+   Compact Split Process Tables (Task Manager Style)
+   ========================================================================== */
+.split-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+@media (max-width: 1000px) {
+    .split-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.column-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.column-header {
+    padding: 10px 14px;
+    background: #ffffff;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.column-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.column-title h2 {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.count-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 9999px;
+}
+
+.count-external {
+    background: var(--orange-100);
+    color: var(--orange-800);
+}
+
+.count-system {
+    background: var(--bg-card-subtle);
+    color: var(--text-secondary);
+}
+
+.column-hint {
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+
+/* Table Container & Scroll */
+.table-container {
+    height: 520px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
+}
+
+.tm-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+    text-align: left;
+}
+
+/* Sticky Task Manager Header */
+.tm-table thead th {
+    position: sticky;
+    top: 0;
+    background: #ffffff;
+    z-index: 10;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    border-bottom: 2px solid var(--border-color);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+.tm-table thead th:hover {
+    background: var(--bg-card-subtle);
+    color: var(--green-700);
+}
+
+.sort-icon {
+    font-size: 9px;
+    margin-left: 2px;
+    color: var(--orange-600);
+}
+
+/* Table Rows & Cells (High Density) */
+.tm-table tbody tr {
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.1s ease;
+}
+
+.tm-table tbody tr:hover {
+    background: #f8fafc;
+}
+
+.tm-table tbody tr.row-focused {
+    background: var(--orange-50) !important;
+    border-left: 3px solid var(--orange-600);
+}
+
+.tm-table td {
+    padding: 4px 8px;
+    vertical-align: middle;
+}
+
+/* Specific Columns */
+.col-pid {
+    width: 58px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+
+.col-name {
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.col-mem {
+    width: 120px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.mem-cell-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.mem-text {
+    font-weight: 600;
+}
+
+.mem-mini-bar {
+    width: 100%;
+    height: 3px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.mem-mini-fill {
+    height: 100%;
+    background: var(--green-500);
+    border-radius: 2px;
+}
+
+.mem-mini-fill.heavy {
+    background: var(--orange-500);
+}
+
+.col-class {
+    width: 62px;
+    text-align: center;
+}
+
+/* Badges for Classification */
+.badge-short {
+    background: var(--green-50);
+    color: var(--green-700);
+    border: 1px solid var(--green-200);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+}
+
+.badge-heavy {
+    background: var(--orange-50);
+    color: var(--orange-700);
+    border: 1px solid var(--orange-200);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: var(--radius-sm);
+}
+
+.col-status {
+    width: 82px;
+    font-size: 10.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.state-running {
+    color: var(--green-600);
+}
+
+.state-suspended {
+    color: var(--orange-600);
+}
+
+.col-action {
+    width: 110px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.row-actions {
+    display: inline-flex;
+    gap: 4px;
+}
+
+/* Row Action Buttons */
+.btn-row {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: 1px solid var(--border-strong);
+    background: #ffffff;
+    color: var(--text-secondary);
+    transition: all 0.12s ease;
+}
+
+.btn-row:hover:not(:disabled) {
+    background: var(--bg-card-subtle);
+}
+
+.btn-focus {
+    border-color: var(--orange-200);
+    color: var(--orange-700);
+}
+
+.btn-focus:hover:not(:disabled) {
+    background: var(--orange-600);
+    color: #ffffff;
+    border-color: var(--orange-700);
+}
+
+.btn-kill {
+    border-color: #fecaca;
+    color: var(--red-600);
+}
+
+.btn-kill:hover:not(:disabled) {
+    background: var(--red-600);
+    color: #ffffff;
+    border-color: var(--red-700);
+}
+
+.btn-kill:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+    color: #94a3b8;
+}
+
+.empty-row td {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 30px !important;
+}
