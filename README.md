@@ -28,6 +28,12 @@ SYSmin/
 │   ├── .dockerignore         # Docker ignore rules
 │   └── README.md             # Frontend hosting & deployment guide
 │
+├── website/                  # Official Public Website & Release Portal
+│   ├── index.html            # Marketing landing page & in-browser downloader
+│   ├── style.css             # Theme stylesheet & layout
+│   ├── vercel.json           # Vercel Edge CDN configuration
+│   └── README.md             # Website deployment guide
+│
 ├── dist/                     # Standalone compiled binary (ProcessController)
 ├── scripts/                  # Network & Proxy helper scripts
 │   ├── check_my_ip.ps1
@@ -71,3 +77,19 @@ To compile into a single, windowless `.exe`:
 build.bat
 ```
 Output executable is saved to `dist/ProcessController.exe`.
+
+---
+
+## 🌐 Official Website & Web Portal (`website/`)
+
+SYSmin includes a modern, high-performance landing page and web release portal located in the [`website/`](./website) folder:
+
+- **Live Demo & Downloads:** Visitors can select their operating system (Windows, Linux, macOS, Docker) and download releases with zero redirects.
+- **Interactive Setup Guide:** Walks users through Step 1 (extracting), Step 2 (1-click `run.vbs` or `run.sh` launcher), and Step 3 (using the dashboard on port `8000`).
+- **Zero-Dependency Edge Deployment:**
+  - **Vercel:** Point your Vercel project's Root Directory to `website` for instant, global Edge CDN deployment.
+  - **GitHub Pages:** Select branch `main` and folder `/website` under repository settings.
+- **Local Preview:** Open [`website/index.html`](./website/index.html) directly in any browser or run:
+  ```bash
+  python -m http.server 8080 --directory website
+  ```
