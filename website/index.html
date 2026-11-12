@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>ThrottlerOS • Localhost Process Throttler &amp; SJF Scheduler</title>
+  <meta name="description" content="Localhost Process Throttler & Priority Scheduler freezes resource-hogging background tasks, queues heavy jobs shortest-first, and runs 100% offline.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --bg2: #0f172a;
+      --panel: #0c1322;
+      --ink: #f8fafc;
+      --muted: #94a3b8;
+      --sky: #38bdf8;
+      --blue: #60a5fa;
+      --deep: #0284c7;
+      --line: rgba(148, 163, 184, 0.16);
+      --line2: rgba(148, 163, 184, 0.3);
+      --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+      --ok: #5fd3a0;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      color-scheme: dark;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      * { transition: none !important; animation: none !important; }
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--muted);
+      font: 400 16px/1.65 var(--sans);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0 0 auto;
+      height: env(safe-area-inset-top, 0px);
+      background: var(--bg);
+      z-index: 60;
+    }
+    #field {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+    main, footer.site { position: relative; z-index: 1; }
+    a { color: var(--blue); }
+    :focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; border-radius: 4px; }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: rgba(148, 163, 184, 0.12);
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      color: var(--ink);
+    }
+    .wrap {
+      width: 100%;
+      max-width: 1224px;
+      margin-inline: auto;
+      padding-left: max(24px, env(safe-area-inset-left, 0px));
+      padding-right: max(24px, env(safe-area-inset-right, 0px));
+    }
+
+    /* header */
+    header.site {
+      position: sticky;
+      top: env(safe-area-inset-top, 0px);
+      z-index: 50;
+      background: rgba(11, 15, 25, 0.82);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+    }
+    .bar { display: flex; align-items: center; gap: 20px; height: 64px; position: relative; }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--ink);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      text-decoration: none;
+      font-size: 17px;
+    }
+    .brand svg { display: block; }
+    nav.primary { margin-left: auto; display: flex; gap: 2px; }
+    nav.primary a {
+      position: relative;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 8px 13px;
+      font-size: 14.5px;
+      transition: color 0.15s;
+    }
+    nav.primary a:hover, nav.primary a[aria-current="true"] { color: var(--ink); }
+    nav.primary a[aria-current="true"]::after {
+      content: "";
+      position: absolute;
+      left: 13px;
+      right: 13px;
+      bottom: 2px;
+      height: 2px;
+      background: var(--sky);
+      border-radius: 2px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      font: 500 14.5px var(--sans);
+      text-decoration: none;
+      padding: 10px 18px;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+    }
+    .btn.primary { background: var(--sky); color: #04121c; }
+    .btn.primary:hover { background: #7dd3fc; }
+    .btn.ghost { color: var(--ink); border-color: var(--line2); background: transparent; }
+    .btn.ghost:hover { border-color: var(--blue); color: var(--blue); }
+    .btn.sm { padding: 8px 14px; font-size: 14px; }
+    .btn.lg { padding: 15px 22px; font-size: 15.5px; width: 100%; }
+    .menu {
+      display: none;
+      background: none;
+      border: 1px solid var(--line2);
+      color: var(--ink);
+      border-radius: 7px;
+      width: 40px;
+      height: 38px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* hero */
+    .hero { padding-block: clamp(52px, 8vw, 104px) clamp(64px, 9vw, 112px); }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+      gap: clamp(36px, 5vw, 72px);
+      align-items: center;
+    }
+    .hero-grid > * { min-width: 0; }
+    h1 {
+      margin: 0;
+      color: var(--ink);
+      font-weight: 600;
+      font-size: clamp(2.3rem, 4.9vw, 3.85rem);
+      line-height: 1.05;
+      letter-spacing: -0.035em;
+      text-wrap: balance;
+    }
+    h1 em { display: block; font-style: normal; color: var(--blue); margin-top: 6px; }
+    .lede { max-width: 46ch; font-size: 1.125rem; margin: 24px 0 32px; }
+    .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+    .facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 22px;
+      margin: 32px 0 0;
+      padding: 0;
+      list-style: none;
+      font: 400 12.5px var(--mono);
+      letter-spacing: 0.02em;
+    }
+    .facts li::before {
+      content: "";
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      margin-right: 9px;
+      background: var(--deep);
+      vertical-align: 2px;
+    }
+
+    /* app window */
+    .win {
+      background: var(--panel);
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.85);
+      overflow: hidden;
+    }
+    .win-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--line);
+      font: 400 12px var(--mono);
+    }
+    .dots { display: flex; gap: 6px; }
+    .dots span { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--line2); }
+    .url {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 4px 10px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .conn-tag {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .conn-tag.live { background: rgba(95, 211, 160, 0.15); color: var(--ok); border: 1px solid rgba(95, 211, 160, 0.3); }
+    .conn-tag.mock { background: rgba(245, 158, 11, 0.15); color: var(--warn); border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border-bottom: 1px solid var(--line);
+    }
+    .stat { padding: 12px 14px; border-right: 1px solid var(--line); min-width: 0; }
+    .stat:last-child { border-right: 0; }
+    .stat b {
+      display: block;
+      font: 500 17px var(--mono);
+      color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .stat span {
+      font: 400 11px var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; max-height: 290px; overflow-y: auto; }
+    .col { min-width: 0; }
+    .col + .col { border-left: 1px solid var(--line); }
+    .ch {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      padding: 9px 14px;
+      font: 500 11px var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(8px);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 12px 9px 14px;
+      border-bottom: 1px solid var(--line);
+      transition: background 0.2s;
+    }
+    .row.frozen { background: rgba(56, 189, 248, 0.07); }
+    .pcell { min-width: 0; }
+    .pn {
+      font: 500 13px var(--mono);
+      color: var(--ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .row.frozen .pn { color: var(--sky); }
+    .ps {
+      font: 400 11.5px var(--mono);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+    }
+    .pc {
+      font: 400 12.5px var(--mono);
+      width: 44px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .act {
+      font: 600 12px var(--mono);
+      padding: 5px 8px;
+      min-width: 62px;
+      border: 1px solid var(--deep);
+      background: var(--deep);
+      color: #fff;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .act:hover:not(:disabled) { background: #0396e0; border-color: #0396e0; }
+    .row.frozen .act { border-color: var(--sky); background: var(--sky); color: #04121c; }
+    .row.frozen .act:hover:not(:disabled) { background: #7dd3fc; border-color: #7dd3fc; }
+    .act:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+      border-color: var(--line2);
+      background: rgba(148, 163, 184, 0.1);
+      color: var(--muted);
+    }
+
+    .queue {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px;
+      font: 400 12px var(--mono);
+      background: rgba(15, 23, 42, 0.5);
+      border-top: 1px solid var(--line);
+    }
+    .queue .ql { letter-spacing: 0.08em; text-transform: uppercase; margin-right: 4px; }
+    .chip {
+      border: 1px solid var(--line2);
+      border-radius: 5px;
+      padding: 3px 8px;
+      color: var(--ink);
+      font-size: 11.5px;
+    }
+    .chip.run { border-color: var(--sky); color: var(--sky); background: rgba(56, 189, 248, 0.08); }
+    .chip.run::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--sky);
+      border-radius: 50%;
+      margin-right: 7px;
+    }
+    .hint { margin: 12px 0 0; font: 400 12px var(--mono); }
+
+    /* sections */
+    section { scroll-margin-top: 72px; padding-block: clamp(64px, 9vw, 112px); }
+    .band { background: rgba(15, 23, 42, 0.78); border-block: 1px solid var(--line); }
+    h2 {
+      margin: 0 0 16px;
+      color: var(--ink);
+      font-weight: 600;
+      font-size: clamp(1.7rem, 3.1vw, 2.5rem);
+      line-height: 1.12;
+      letter-spacing: -0.028em;
+      text-wrap: balance;
+    }
+    h3 { margin: 0; color: var(--ink); font-weight: 600; font-size: 1.15rem; letter-spacing: -0.012em; }
+    .intro { max-width: 58ch; margin: 0 0 clamp(32px, 5vw, 52px); font-size: 1.06rem; }
+    .label {
+      font: 500 12px var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--sky);
+      margin: 0 0 14px;
+    }
+
+    /* features */
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .cell {
+      background: rgba(11, 15, 25, 0.94);
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-width: 0;
+    }
+    .viz {
+      height: 132px;
+      border-bottom: 1px dashed var(--line2);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+    }
+    .viz svg { width: 100%; height: 112px; display: block; }
+    .cell p { margin: 0; max-width: 52ch; }
+    .code { margin-top: auto; padding-top: 6px; }
+    .code span {
+      display: block;
+      font: 400 12.5px var(--mono);
+      color: var(--blue);
+      background: rgba(2, 132, 199, 0.1);
+      padding: 7px 11px;
+      border-radius: 5px;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .tl { font: 400 10px var(--mono); fill: var(--muted); }
+    .tl.hi { fill: var(--ink); }
+
+    /* download */
+    .platform-selector {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .plat-btn {
+      padding: 8px 16px;
+      border-radius: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line2);
+      color: var(--muted);
+      font: 500 13px var(--mono);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .plat-btn:hover { color: var(--ink); border-color: var(--sky); }
+    .plat-btn.active {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: var(--sky);
+      color: var(--sky);
+    }
+
+    .dl-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+      border: 1px solid var(--line2);
+      border-radius: 14px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .dl-card > div { padding: clamp(24px, 4vw, 40px); min-width: 0; }
+    .dl-card > div + div { border-left: 1px solid var(--line); background: rgba(15, 23, 42, 0.6); }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font: 500 12px var(--mono);
+      color: var(--ink);
+      border: 1px solid var(--line2);
+      padding: 4px 10px;
+      border-radius: 999px;
+      margin-bottom: 18px;
+    }
+    .badge i { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+    .req { margin: 22px 0 0; }
+    .req div {
+      display: grid;
+      grid-template-columns: 110px minmax(0, 1fr);
+      gap: 12px;
+      padding: 11px 0;
+      border-top: 1px solid var(--line);
+    }
+    .req dt {
+      font: 400 12px var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding-top: 3px;
+    }
+    .req dd { margin: 0; color: var(--ink); }
+    .file { font: 400 12.5px var(--mono); margin: 14px 0 0; word-break: break-all; }
+    .prog { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; margin-top: 16px; }
+    .prog i { display: block; height: 100%; width: 0; background: var(--sky); transition: width 0.1s linear; }
+    .status { min-height: 3.2em; margin: 12px 0 0; font: 400 12.5px/1.55 var(--mono); }
+    .steps { margin: 26px 0 0; padding: 0; list-style: none; counter-reset: s; }
+    .steps li {
+      counter-increment: s;
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      padding: 9px 0;
+      border-top: 1px solid var(--line);
+      color: var(--ink);
+    }
+    .steps li::before { content: counter(s); font: 500 12px var(--mono); color: var(--sky); padding-top: 3px; }
+
+    /* about */
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+      gap: clamp(32px, 6vw, 80px);
+      align-items: start;
+    }
+    .split > * { min-width: 0; }
+    .prose h3 { margin: 30px 0 8px; }
+    .prose p { margin: 0 0 14px; max-width: 62ch; }
+    .sticky { position: sticky; top: 96px; }
+    .slices { border: 1px solid var(--line2); border-radius: 10px; background: var(--panel); padding: 20px; }
+    .slices h4 {
+      margin: 0 0 8px;
+      font: 500 12px var(--mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .strip { display: flex; gap: 3px; margin-bottom: 8px; }
+    .strip span { flex: 1; height: 26px; border-radius: 2px; background: rgba(148, 163, 184, 0.28); }
+    .strip span.f { background: var(--blue); }
+    .strip span.g1 { background: rgba(148, 163, 184, 0.18); }
+    .strip span.g2 { background: rgba(148, 163, 184, 0.38); }
+    .share { font: 400 12.5px var(--mono); margin: 0 0 22px; }
+    .share b { color: var(--ink); font-weight: 500; }
+    .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 400 11.5px var(--mono); margin-top: 4px; }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
+
+    /* licenses */
+    .lic-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: clamp(24px, 5vw, 64px);
+      align-items: start;
+    }
+    .lic-grid > * { min-width: 0; }
+    pre.mit {
+      margin: 0;
+      max-height: 360px;
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--line2);
+      border-radius: 10px;
+      padding: 20px;
+      font: 400 12.5px/1.7 var(--mono);
+      white-space: pre-wrap;
+      color: var(--muted);
+    }
+    .scroll-x { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14.5px; min-width: 460px; }
+    th {
+      text-align: left;
+      font: 500 11px var(--mono);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0 12px 10px 0;
+      border-bottom: 1px solid var(--line2);
+    }
+    td { padding: 14px 12px 14px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    td:first-child { color: var(--ink); font: 500 14px var(--mono); }
+    td.lc { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+    .note { margin-top: 18px; max-width: 56ch; font-size: 14.5px; }
+
+    /* help */
+    .help-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+      gap: clamp(28px, 6vw, 80px);
+      align-items: start;
+    }
+    .help-grid > * { min-width: 0; }
+    .addr {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line2);
+      border-radius: 8px;
+      padding: 8px 8px 8px 14px;
+    }
+    .addr code {
+      background: none;
+      padding: 0;
+      font-size: 13.5px;
+      flex: 1;
+      min-width: 0;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .addr button { font: 500 12px var(--mono); }
+    .lan-note { font: 400 12px var(--mono); color: var(--sky); margin: 6px 0 0; }
+
+    details.faq { border-top: 1px solid var(--line); }
+    details.faq:last-child { border-bottom: 1px solid var(--line); }
+    details.faq summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 18px 36px 18px 0;
+      color: var(--ink);
+      font-weight: 500;
+      font-size: 1.02rem;
+      position: relative;
+    }
+    details.faq summary::-webkit-details-marker { display: none; }
+    details.faq summary::after {
+      content: "+";
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-52%);
+      font: 400 22px var(--mono);
+      color: var(--sky);
+      transition: transform 0.2s;
+    }
+    details.faq[open] summary::after { transform: translateY(-52%) rotate(45deg); }
+    details.faq .a { padding: 0 0 20px; }
+    details.faq .a p { margin: 0 0 12px; max-width: 64ch; }
+    details.faq pre {
+      margin: 0 0 14px;
+      overflow-x: auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font: 400 12.5px/1.65 var(--mono);
+      color: var(--ink);
+    }
+
+    /* footer */
+    footer.site {
+      border-top: 1px solid var(--line);
+      background: rgba(11, 15, 25, 0.92);
+      padding-block: 40px;
+      font-size: 14px;
+    }
+    .foot {
+      display: grid;
+      grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+      gap: 32px;
+    }
+    .foot p { margin: 0 0 10px; max-width: 64ch; }
+    .foot nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 22px;
+      align-content: start;
+      justify-content: flex-end;
+    }
+    .foot nav a { color: var(--muted); text-decoration: none; }
+    .foot nav a:hover { color: var(--ink); }
+
+    @media (max-width: 960px) {
+      .hero-grid, .split, .help-grid, .lic-grid, .dl-card, .foot { grid-template-columns: minmax(0, 1fr); }
+      .dl-card > div + div { border-left: 0; border-top: 1px solid var(--line); }
+      .sticky { position: static; }
+      .foot nav { justify-content: flex-start; }
+    }
+    @media (max-width: 760px) {
+      .menu { display: inline-flex; }
+      .bar .btn.dl { margin-left: auto; }
+      nav.primary {
+        position: absolute;
+        top: 100%;
+        left: calc(-1 * max(24px, env(safe-area-inset-left, 0px)));
+        right: calc(-1 * max(24px, env(safe-area-inset-right, 0px)));
+        flex-direction: column;
+        gap: 0;
+        background: var(--bg2);
+        border-bottom: 1px solid var(--line2);
+        padding: 8px max(24px, env(safe-area-inset-right, 0px)) 12px max(24px, env(safe-area-inset-left, 0px));
+        display: none;
+      }
+      header.open nav.primary { display: flex; }
+      nav.primary a { padding: 12px 0; }
+      nav.primary a[aria-current="true"]::after { left: 0; right: auto; width: 24px; bottom: 6px; }
+      .grid2 { grid-template-columns: minmax(0, 1fr); }
+      .cell { padding: 22px; }
+    }
+    @media (min-width: 761px) { .bar .btn.dl { margin-left: 8px; } }
+    @media (max-width: 520px) {
+      .cols { grid-template-columns: minmax(0, 1fr); }
+      .col + .col { border-left: 0; border-top: 1px solid var(--line); }
+      .stat b { font-size: 15px; }
+      .req div { grid-template-columns: 1fr; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="field" aria-hidden="true"></canvas>
+
+<header class="site" id="top">
+  <div class="wrap">
+    <div class="bar">
+      <a class="brand" href="#home" aria-label="ThrottlerOS home">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="21" height="21" rx="5" stroke="#38bdf8" stroke-width="1.5"/>
+          <rect x="8" y="7" width="2.6" height="10" rx="0.8" fill="#38bdf8"/>
+          <rect x="13.4" y="7" width="2.6" height="10" rx="0.8" fill="#60a5fa"/>
+        </svg>
+        ThrottlerOS
+      </a>
+      <nav class="primary" id="nav" aria-label="Primary">
+        <a href="#home" data-s="home">Home</a>
+        <a href="#features" data-s="features">Features</a>
+        <a href="#get" data-s="get">Download</a>
+        <a href="#about" data-s="about">About</a>
+        <a href="#licenses" data-s="licenses">Licenses</a>
+        <a href="#help" data-s="help">Help</a>
+      </nav>
+      <a class="btn primary sm dl" href="#get">Download</a>
+      <button class="menu" id="menu" type="button" aria-expanded="false" aria-controls="nav" aria-label="Menu">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+          <path d="M2 5h14M2 9h14M2 13h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="home" class="hero" style="padding-top: clamp(52px, 8vw, 96px)">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <h1>Reclaim Your PC Performance.<em>Zero Cloud. 100% Offline.</em></h1>
+        <p class="lede">Localhost Process Throttler &amp; Priority Scheduler freezes the apps that hog your machine, queues heavy jobs shortest-first, and runs entirely from a page on 127.0.0.1. Nothing is uploaded, and nothing is killed.</p>
+        <div class="cta">
+          <a class="btn primary" href="#get">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Download for Your Device
+          </a>
+          <a class="btn ghost" href="#about">How it works</a>
+        </div>
+        <ul class="facts">
+          <li>v1.0.0 stable</li>
+          <li>Windows, Linux &amp; macOS</li>
+          <li>MIT licensed</li>
+          <li>Cross-Device Ready</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="win" id="win">
+          <div class="win-top">
+            <div class="dots" aria-hidden="true"><span></span><span></span><span></span></div>
+            <div class="url">
+              <span id="winUrl">http://127.0.0.1:8742</span>
+              <span id="connTag" class="conn-tag mock">PREVIEW MOCK</span>
+            </div>
+          </div>
+          <div class="stats" aria-live="polite">
+            <div class="stat"><b id="sReclaim">0.0%</b><span>CPU reclaimed</span></div>
+            <div class="stat"><b id="sHeld">0 MB</b><span>RAM held intact</span></div>
+            <div class="stat"><b id="sFrozen">0</b><span>Frozen</span></div>
+          </div>
+          <div class="cols">
+            <div class="col"><div class="ch">External apps</div><div id="colExt"></div></div>
+            <div class="col"><div class="ch">System background</div><div id="colSys"></div></div>
+          </div>
+          <div class="queue" id="queueChips">
+            <span class="ql">SJF queue</span>
+            <span class="chip run">unzip logs · 4 s</span>
+            <span class="chip">reindex photos · 38 s</span>
+            <span class="chip">export video · 3 min 40 s</span>
+          </div>
+        </div>
+        <p class="hint" id="winHint">Sample processes. Press Freeze or Resume to try it.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="features" class="band">
+  <div class="wrap">
+    <h2>Four tools on one local page</h2>
+    <p class="intro">Each one does a single job, and each one works without a network connection.</p>
+    <div class="grid2">
+      <article class="cell">
+        <div class="viz">
+          <svg viewBox="0 0 320 112" role="img" aria-label="CPU usage drops to zero at the moment of suspension while memory stays level">
+            <path d="M0 58 L10 40 L20 66 L30 30 L40 56 L50 24 L60 60 L70 36 L80 64 L90 28 L100 54 L110 40 L120 66 L130 34 L140 56 L150 48 L158 98 L320 98" fill="none" stroke="#60a5fa" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M0 14 L320 14" fill="none" stroke="#38bdf8" stroke-width="1.4" stroke-dasharray="4 4"/>
+            <path d="M158 6 L158 108" fill="none" stroke="rgba(148,163,184,.5)" stroke-width="1" stroke-dasharray="2 3"/>
+            <text class="tl hi" x="165" y="28">suspend()</text>
+            <text class="tl" x="4" y="108">CPU</text>
+            <text class="tl" x="4" y="9">RAM held</text>
+          </svg>
+        </div>
+        <h3>Non-destructive freezing</h3>
+        <p>Pause a memory-hungry app and it stops using the processor at once. Its memory, open files and unsaved work stay exactly as they were. Resume it and it carries on from the same instruction.</p>
+        <div class="code"><span>proc.suspend() &middot; proc.resume()</span></div>
+      </article>
+
+      <article class="cell">
+        <div class="viz">
+          <svg viewBox="0 0 320 112" role="img" aria-label="Five jobs run one after another, shortest first">
+            <g font-family="Geist Mono, monospace">
+              <rect x="0" y="34" width="18" height="30" fill="#7dd3fc"/>
+              <rect x="20" y="34" width="27" height="30" fill="#38bdf8"/>
+              <rect x="49" y="34" width="45" height="30" fill="#2aa5e2"/>
+              <rect x="96" y="34" width="72" height="30" fill="#0f8fd0"/>
+              <rect x="170" y="34" width="117" height="30" fill="#0284c7"/>
+            </g>
+            <text class="tl hi" x="3" y="28">2s</text>
+            <text class="tl hi" x="23" y="28">3s</text>
+            <text class="tl hi" x="52" y="28">5s</text>
+            <text class="tl hi" x="99" y="28">8s</text>
+            <text class="tl hi" x="173" y="28">13s</text>
+            <path d="M0 82 L287 82 M283 78 L289 82 L283 86" fill="none" stroke="rgba(148,163,184,.5)" stroke-width="1"/>
+            <text class="tl" x="0" y="102">estimated runtime, shortest first</text>
+          </svg>
+        </div>
+        <h3>Shortest-job-first automation</h3>
+        <p>Queue your heavy tasks and ThrottlerOS runs them one at a time, shortest estimate first. Quick jobs finish early instead of waiting behind a long export.</p>
+        <div class="code"><span>queue.sort(key=lambda j: j.est_seconds)</span></div>
+      </article>
+
+      <article class="cell">
+        <div class="viz">
+          <svg viewBox="0 0 320 112" role="img" aria-label="Two columns of processes: external apps and system background tasks">
+            <rect x="6" y="6" width="146" height="100" fill="none" stroke="rgba(148,163,184,.4)"/>
+            <rect x="168" y="6" width="146" height="100" fill="none" stroke="rgba(148,163,184,.4)"/>
+            <text class="tl hi" x="14" y="22">EXTERNAL APPS</text>
+            <text class="tl hi" x="176" y="22">SYSTEM BACKGROUND</text>
+            <rect x="14" y="34" width="98" height="11" fill="rgba(56,189,248,.35)"/>
+            <rect x="14" y="52" width="70" height="11" fill="rgba(148,163,184,.3)"/>
+            <rect x="14" y="70" width="108" height="11" fill="rgba(148,163,184,.3)"/>
+            <rect x="14" y="88" width="56" height="11" fill="rgba(148,163,184,.3)"/>
+            <rect x="176" y="34" width="84" height="11" fill="rgba(148,163,184,.3)"/>
+            <rect x="176" y="52" width="104" height="11" fill="rgba(56,189,248,.35)"/>
+            <rect x="176" y="70" width="62" height="11" fill="rgba(148,163,184,.3)"/>
+            <rect x="176" y="88" width="92" height="11" fill="rgba(148,163,184,.3)"/>
+          </svg>
+        </div>
+        <h3>Dual-column segregation</h3>
+        <p>Apps you launched sit on the left. Windows services and system background tasks sit on the right. Protected system processes are listed but locked, so you cannot freeze one by accident.</p>
+        <div class="code"><span>scope = "external" | "system"</span></div>
+      </article>
+
+      <article class="cell">
+        <div class="viz">
+          <svg viewBox="0 0 320 112" role="img" aria-label="The browser talks to ThrottlerOS on the loopback address; the connection to the network is cut">
+            <rect x="4" y="36" width="72" height="40" fill="none" stroke="rgba(148,163,184,.55)"/>
+            <text class="tl hi" x="16" y="60">browser</text>
+            <rect x="112" y="36" width="104" height="40" fill="rgba(56,189,248,.12)" stroke="#38bdf8"/>
+            <text class="tl hi" x="122" y="52">ThrottlerOS</text>
+            <text class="tl" x="122" y="66">127.0.0.1:8742</text>
+            <path d="M76 56 L112 56 M106 52 L112 56 L106 60" fill="none" stroke="#60a5fa" stroke-width="1.4"/>
+            <path d="M216 56 L252 56" fill="none" stroke="rgba(148,163,184,.5)" stroke-width="1.2" stroke-dasharray="3 3"/>
+            <path d="M228 48 L240 64 M240 48 L228 64" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <rect x="254" y="36" width="62" height="40" fill="none" stroke="rgba(148,163,184,.3)" stroke-dasharray="3 3"/>
+            <text class="tl" x="266" y="60">network</text>
+            <text class="tl" x="4" y="100">loopback only &middot; no telemetry</text>
+          </svg>
+        </div>
+        <h3>Complete local privacy</h3>
+        <p>The interface is served from 127.0.0.1 and nowhere else. There are no accounts, no usage reports and no update checks. Unplug the network cable and it behaves the same.</p>
+        <div class="code"><span>uvicorn.run(app, host="127.0.0.1", port=8742)</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="get">
+  <div class="wrap">
+    <h2>Download ThrottlerOS &amp; SYSmin</h2>
+    <p class="intro">Extract it, run the launcher, and open the page on this machine or across devices.</p>
+
+    <!-- Platform Selector -->
+    <div class="platform-selector">
+      <button class="plat-btn active" data-plat="windows" onclick="selectPlatform('windows')">&#x1F5A5;&#xFE0F; Windows (.zip)</button>
+      <button class="plat-btn" data-plat="linux" onclick="selectPlatform('linux')">&#x1F427; Linux (.tar.gz)</button>
+      <button class="plat-btn" data-plat="macos" onclick="selectPlatform('macos')">&#x1F34E; macOS (.tar.gz)</button>
+      <button class="plat-btn" data-plat="source" onclick="selectPlatform('source')">&#x1F4E6; Full Python Module</button>
+    </div>
+
+    <div class="dl-card">
+      <div>
+        <span class="badge"><i></i>v1.0.0 Stable</span>
+        <h3 id="dlCardTitle" style="font-size:1.5rem">ThrottlerOS for Windows</h3>
+        <dl class="req" id="dlCardReq">
+          <div><dt>System</dt><dd id="reqOS">Windows 10 or 11, 64-bit</dd></div>
+          <div><dt>Runtime</dt><dd>Python 3.11 or newer</dd></div>
+          <div><dt>Privileges</dt><dd id="reqPriv">Administrator rights</dd></div>
+          <div><dt>Network</dt><dd>None needed (LAN optional)</dd></div>
+          <div><dt>License</dt><dd>MIT, open source</dd></div>
+        </dl>
+      </div>
+      <div>
+        <button class="btn primary lg" id="dlBtn" type="button">
+          <svg width="17" height="17" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 2v8m0 0L4.5 6.5M8 10l3.5-3.5M2.5 13.5h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span id="dlLabel">Download for Windows (.zip / .vbs)</span>
+        </button>
+        <p class="file" id="dlFileDesc">ThrottlerOS-1.0.0-win64.zip<br>install.vbs &middot; run.vbs &middot; app/ &middot; requirements.txt</p>
+        <div class="prog" aria-hidden="true"><i id="dlBar"></i></div>
+        <p class="status" id="dlStatus" role="status"></p>
+        <ol class="steps" id="dlSteps">
+          <li>Extract the zip to a folder you keep.</li>
+          <li>Right-click <code>install.vbs</code> and choose Run as administrator (or run <code>install.bat</code>).</li>
+          <li>Double-click <code>run.vbs</code>. No console window appears.</li>
+          <li>Open <code>http://127.0.0.1:8742</code> in any browser.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="about" class="band">
+  <div class="wrap">
+    <div class="split">
+      <div class="prose">
+        <p class="label">About</p>
+        <h2>Why a PC slows down when nothing looks wrong</h2>
+        <p>Every runnable thread waits for a slice of processor time. When a browser, an indexer, a sync client and an update service are all runnable at once, the scheduler rotates between them. Each rotation costs a context switch and leaves the CPU cache cold. Your foreground app gets a smaller share, delivered in smaller and less predictable pieces. That is thread contention.</p>
+        <h3>What suspension does</h3>
+        <p>ThrottlerOS suspends a process through the same kernel mechanism debuggers use (<code>NtSuspendProcess</code> on Windows, <code>SIGSTOP</code> on Linux/Unix). The process's threads stop being scheduled. Its memory, open files and handles stay as they were, so no work is lost and nothing has to restart. When you resume it, every thread continues from the instruction where it stopped.</p>
+        <h3>What it does not do</h3>
+        <p>A suspended process still owns its memory. Freezing returns processor time, disk activity and memory bandwidth immediately, and it lets the OS trim the idle working set if memory gets tight. It does not give RAM back on the spot. If you need the memory itself, close the application.</p>
+        <h3>Why shortest job first</h3>
+        <p>When several heavy tasks are waiting, running them one at a time in order of estimated runtime gives the lowest average wait. The scheduler holds the long job back until the short ones are done, so they stop competing for the same cores.</p>
+      </div>
+      <div class="sticky">
+        <div class="slices">
+          <h4>One core, 28 time slices</h4>
+          <div class="strip" id="stripBefore" aria-label="Before freezing: the foreground app gets a small share"></div>
+          <p class="share" id="shareBefore"></p>
+          <h4>Background tasks suspended</h4>
+          <div class="strip" id="stripAfter" aria-label="After freezing: the foreground app gets most slices"></div>
+          <p class="share" id="shareAfter"></p>
+          <div class="legend">
+            <span><i style="background:var(--blue)"></i>Foreground app</span>
+            <span><i style="background:rgba(148,163,184,.38)"></i>Background tasks</span>
+          </div>
+        </div>
+        <p class="hint">Illustrative. Real scheduling varies with priority and core count.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="licenses">
+  <div class="wrap">
+    <p class="label">Licenses</p>
+    <h2>Open source under the MIT license</h2>
+    <p class="intro">You can use, copy, modify and redistribute ThrottlerOS, including commercially, as long as the notice below stays with it.</p>
+    <div class="lic-grid">
+      <pre class="mit" tabindex="0" aria-label="MIT license text">MIT License
+
+Copyright (c) 2026 ThrottlerOS &amp; SYSmin contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+      <div>
+        <h3 style="margin-bottom:16px">Third-party dependencies</h3>
+        <div class="scroll-x">
+          <table>
+            <thead><tr><th>Package</th><th>License</th><th>Used for</th></tr></thead>
+            <tbody>
+              <tr><td>psutil</td><td class="lc">BSD-3-Clause</td><td>Listing processes, suspending and resuming them, reading memory and CPU use</td></tr>
+              <tr><td>fastapi</td><td class="lc">MIT</td><td>The local API behind the web page</td></tr>
+              <tr><td>uvicorn</td><td class="lc">BSD-3-Clause</td><td>The server that listens on 127.0.0.1 or 0.0.0.0 (LAN)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="note">Each package keeps its own license, which applies to that package. Install them with <code>pip install -r requirements.txt</code> or <code>pip install .</code>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="help" class="band">
+  <div class="wrap">
+    <div class="help-grid">
+      <div>
+        <p class="label">Help</p>
+        <h2>Connect &amp; Troubleshoot</h2>
+        <p>ThrottlerOS runs locally on this machine and can be accessed from other devices on your home or office network:</p>
+        <div class="addr">
+          <code id="addrText">http://127.0.0.1:8742</code>
+          <button class="btn ghost sm" type="button" id="copyBtn">Copy</button>
+        </div>
+        <div class="addr" id="lanAddrRow" style="display:none; margin-top:8px;">
+          <code id="lanAddrText">http://192.168.1.x:8742</code>
+          <button class="btn ghost sm" type="button" id="copyLanBtn">Copy LAN</button>
+        </div>
+        <p class="lan-note" id="lanNote">&#x1F4F1; Connect from your phone or tablet on the same Wi-Fi using the LAN address above.</p>
+      </div>
+      <div>
+        <details class="faq" open>
+          <summary>How do I run ThrottlerOS on different devices?</summary>
+          <div class="a">
+            <p><strong>Windows:</strong> Download the .zip, extract, run <code>install.vbs</code> once, then double-click <code>run.vbs</code> for background execution.</p>
+            <p><strong>Linux &amp; Raspberry Pi:</strong> Extract the .tar.gz, run <code>./install.sh</code>, and launch with <code>./run.sh --lan</code> or install <code>throttleros.service</code> into systemd.</p>
+            <p><strong>macOS:</strong> Extract the archive and execute <code>./run.sh</code>.</p>
+            <p><strong>Any platform with Python:</strong> Run <code>pip install .</code> from the repo root and type <code>throttleros --lan</code>.</p>
+          </div>
+        </details>
+        <details class="faq">
+          <summary>How do I monitor and throttle from my phone or tablet?</summary>
+          <div class="a">
+            <p>Start the server with the <code>--lan</code> flag:</p>
+            <pre>python -m backend.main --lan --port 8742</pre>
+            <p>The backend binds to <code>0.0.0.0</code> and outputs your machine's LAN address (e.g. <code>http://192.168.1.15:8742</code>). Open that URL in your mobile browser to control processes remotely!</p>
+          </div>
+        </details>
+        <details class="faq">
+          <summary>I get AccessDenied when I freeze a process</summary>
+          <div class="a">
+            <p>That is <code>psutil.AccessDenied</code>. The operating system refused the suspension because ThrottlerOS lacks administrative rights over that process. Run <code>run.vbs</code> (Windows) or <code>run.sh</code> (Linux) with elevated Administrator or sudo privileges.</p>
+            <p>Protected system services (System, csrss.exe, systemd, etc.) are permanently locked by design to prevent accidental system instability.</p>
+          </div>
+        </details>
+        <details class="faq">
+          <summary>Is it safe to freeze a browser or game?</summary>
+          <div class="a">
+            <p>Yes. When resumed, the application continues from its exact instruction state with unsaved documents and tabs intact. Online games and real-time streams may timeout if frozen for long periods.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <div class="foot">
+      <div>
+        <p style="color:var(--ink)">&copy; 2026 ThrottlerOS &amp; SYSmin contributors. Released under the MIT license.</p>
+        <p>Zero cloud dependencies. 100% offline local loopback architecture.</p>
+      </div>
+      <nav aria-label="Footer">
+        <a href="#home">Home</a>
+        <a href="#features">Features</a>
+        <a href="#get">Download</a>
+        <a href="#about">About</a>
+        <a href="#licenses">Licenses</a>
+        <a href="#help">Help</a>
+      </nav>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  /* ---------- API Base Configuration ---------- */
+  var API_BASE = '';
+  if (window.location.protocol === 'file:' || !window.location.port) {
+    API_BASE = 'http://127.0.0.1:8742';
+  } else {
+    API_BASE = window.location.origin;
+  }
+
+  var isLive = false;
+  var liveData = { ext: [], sys: [] };
+
+  /* ---------- Canvas Lattice Background Animation ---------- */
+  var cv = document.getElementById('field');
+  var ctx = cv.getContext('2d');
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var CELL = 64, W = 0, H = 0, sy = 0, lastY = 0, vel = 0, packets = [];
+  var DX = [1, 0, -1, 0], DY = [0, 1, 0, -1];
+
+  function hash(x, y, d) {
+    var n = (Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(d + 7, 144665)) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    n ^= n >>> 16;
+    return (n >>> 0) / 4294967296;
+  }
+  function edge(c, r, d) {
+    if (d === 0) return hash(c, r, 0) < 0.36;
+    if (d === 1) return hash(c, r, 1) < 0.36;
+    if (d === 2) return hash(c - 1, r, 0) < 0.36;
+    return hash(c, r - 1, 1) < 0.36;
+  }
+  function off() { return reduce ? 0 : sy * 0.22; }
+
+  function spawn(p) {
+    var o = off(), r0 = Math.floor(o / CELL), rows = Math.ceil(H / CELL) + 1, cols = Math.ceil(W / CELL) + 1;
+    for (var i = 0; i < 30; i++) {
+      var c = Math.floor(Math.random() * cols), r = r0 + Math.floor(Math.random() * rows);
+      var ds = [];
+      for (var d = 0; d < 4; d++) if (edge(c, r, d)) ds.push(d);
+      if (ds.length) {
+        p.c = c; p.r = r; p.dir = ds[Math.floor(Math.random() * ds.length)];
+        p.t = Math.random(); p.sp = 0.5 + Math.random() * 0.6;
+        return p;
+      }
+    }
+    p.c = 0; p.r = r0; p.dir = 0; p.t = 0; p.sp = 0;
+    return p;
+  }
+  function resize() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    var rect = cv.getBoundingClientRect();
+    W = rect.width; H = rect.height;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var n = reduce ? 0 : Math.max(10, Math.min(26, Math.round(W * H / 70000)));
+    packets = [];
+    for (var i = 0; i < n; i++) packets.push(spawn({}));
+    draw();
+  }
+  function step(dt) {
+    var boost = 1 + Math.min(vel * 0.35, 3);
+    var o = off();
+    for (var i = 0; i < packets.length; i++) {
+      var p = packets[i];
+      p.t += p.sp * (dt * boost);
+      var guard = 0;
+      while (p.t >= 1 && guard++ < 4) {
+        p.t -= 1; p.c += DX[p.dir]; p.r += DY[p.dir];
+        var ds = [], back = (p.dir + 2) % 4;
+        for (var d = 0; d < 4; d++) if (d !== back && edge(p.c, p.r, d)) ds.push(d);
+        p.dir = ds.length ? ds[Math.floor(Math.random() * ds.length)] : back;
+      }
+      var px = (p.c + DX[p.dir] * p.t) * CELL, py = (p.r + DY[p.dir] * p.t) * CELL - o;
+      if (px < -60 || px > W + 60 || py < -60 || py > H + 60) spawn(p);
+    }
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    var o = off(), r0 = Math.floor(o / CELL) - 1, r1 = Math.ceil((o + H) / CELL) + 1, c1 = Math.ceil(W / CELL) + 1;
+    var r, c;
+    ctx.fillStyle = 'rgba(148,163,184,0.10)';
+    ctx.beginPath();
+    for (r = r0; r <= r1; r++) for (c = 0; c <= c1; c++) ctx.rect(c * CELL - 0.75, r * CELL - o - 0.75, 1.5, 1.5);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(96,165,250,0.13)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (r = r0; r <= r1; r++) for (c = 0; c <= c1; c++) {
+      var x = c * CELL, y = r * CELL - o;
+      if (edge(c, r, 0)) { ctx.moveTo(x, y + 0.5); ctx.lineTo(x + CELL, y + 0.5); }
+      if (edge(c, r, 1)) { ctx.moveTo(x + 0.5, y); ctx.lineTo(x + 0.5, y + CELL); }
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(56,189,248,0.34)';
+    ctx.beginPath();
+    for (r = r0; r <= r1; r++) for (c = 0; c <= c1; c++) {
+      if (edge(c, r, 0) || edge(c, r, 1) || edge(c, r, 2) || edge(c, r, 3)) ctx.rect(c * CELL - 2, r * CELL - o - 2, 4, 4);
+    }
+    ctx.fill();
+    var a = 0.55 + Math.min(vel * 0.03, 0.35);
+    ctx.lineWidth = 1.6;
+    for (var i = 0; i < packets.length; i++) {
+      var p = packets[i];
+      var px = (p.c + DX[p.dir] * p.t) * CELL, py = (p.r + DY[p.dir] * p.t) * CELL - o;
+      var tx = px - DX[p.dir] * 26, ty = py - DY[p.dir] * 26;
+      var g = ctx.createLinearGradient(tx, ty, px, py);
+      g.addColorStop(0, 'rgba(56,189,248,0)');
+      g.addColorStop(1, 'rgba(125,211,252,' + a + ')');
+      ctx.strokeStyle = g;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(px, py); ctx.stroke();
+      ctx.fillStyle = 'rgba(186,230,253,' + Math.min(a + 0.2, 0.95) + ')';
+      ctx.fillRect(px - 2, py - 2, 4, 4);
+    }
+  }
+  window.addEventListener('scroll', function () { sy = window.scrollY; if (reduce) return; }, { passive: true });
+  window.addEventListener('resize', resize);
+  var last = 0;
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (document.hidden || reduce) return;
+    if (ts - last < 33) return;
+    var dt = Math.min((ts - last) / 1000, 0.1);
+    last = ts;
+    vel = vel * 0.9 + Math.abs(sy - lastY) * 0.1;
+    lastY = sy;
+    step(dt);
+    draw();
+  }
+  sy = window.scrollY || 0;
+  resize();
+  if (!reduce) requestAnimationFrame(frame);
+
+  /* ---------- Nav Hamburger & Scroll Tracking ---------- */
+  var header = document.querySelector('header.site');
+  var menu = document.getElementById('menu');
+  menu.addEventListener('click', function () {
+    var open = header.classList.toggle('open');
+    menu.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  document.querySelectorAll('nav.primary a').forEach(function (a) {
+    a.addEventListener('click', function () { header.classList.remove('open'); menu.setAttribute('aria-expanded', 'false'); });
+  });
+
+  /* ---------- Mock Data (Fallback when server is offline) ---------- */
+  var mockD = {
+    ext: [
+      { n: 'chrome.exe', pid: 11284, mem: 2140, cpu: 9.6, is_protected: false },
+      { n: 'Teams.exe', pid: 8812, mem: 1210, cpu: 6.2, is_protected: false },
+      { n: 'Code.exe', pid: 15520, mem: 812, cpu: 3.1, is_protected: false },
+      { n: 'Spotify.exe', pid: 9304, mem: 390, cpu: 1.4, is_protected: false }
+    ],
+    sys: [
+      { n: 'SearchIndexer.exe', pid: 6048, mem: 186, cpu: 5.8, is_protected: false },
+      { n: 'CompatTelRunner.exe', pid: 3920, mem: 96, cpu: 4.7, is_protected: false },
+      { n: 'OneDrive.exe', pid: 7716, mem: 240, cpu: 2.2, is_protected: false },
+      { n: 'TiWorker.exe', pid: 12088, mem: 520, cpu: 7.9, is_protected: false }
+    ]
+  };
+  var mockFrozen = { 'Teams.exe': true, 'TiWorker.exe': true };
+
+  function fmtMem(m) { return m >= 1000 ? (m / 1024).toFixed(1) + ' GB' : m + ' MB'; }
+
+  function rowHTML(p) {
+    var isF = isLive ? !!p.is_frozen : !!mockFrozen[p.n];
+    var lockAttr = p.is_protected ? ' disabled title="Protected system service"' : '';
+    return '<div class="row' + (isF ? ' frozen' : '') + '">' +
+      '<div class="pcell">' +
+        '<div class="pn" title="' + p.n + '">' + p.n + '</div>' +
+        '<div class="ps">PID ' + p.pid + ' &middot; ' + fmtMem(p.mem) + '</div>' +
+      '</div>' +
+      '<div class="pc">' + (isF ? '0.0' : p.cpu.toFixed(1)) + '%</div>' +
+      '<button type="button" class="act" data-pid="' + p.pid + '" data-p="' + p.n + '" aria-pressed="' + isF + '"' + lockAttr + '>' +
+        (isF ? 'Resume' : 'Freeze') +
+      '</button>' +
+    '</div>';
+  }
+
+  function renderRows() {
+    var extList = isLive ? liveData.ext : mockD.ext;
+    var sysList = isLive ? liveData.sys : mockD.sys;
+
+    document.getElementById('colExt').innerHTML = extList.map(rowHTML).join('') || '<div style="padding:14px;font-size:12px;color:var(--muted)">No user apps</div>';
+    document.getElementById('colSys').innerHTML = sysList.map(rowHTML).join('') || '<div style="padding:14px;font-size:12px;color:var(--muted)">No system background apps</div>';
+
+    if (!isLive) {
+      var all = mockD.ext.concat(mockD.sys), cpu = 0, mem = 0, n = 0;
+      all.forEach(function (p) { if (mockFrozen[p.n]) { cpu += p.cpu; mem += p.mem; n++; } });
+      document.getElementById('sReclaim').textContent = cpu.toFixed(1) + '%';
+      document.getElementById('sHeld').textContent = fmtMem(mem);
+      document.getElementById('sFrozen').textContent = String(n);
+    }
+  }
+
+  /* ---------- App Window Interaction (Freeze / Resume) ---------- */
+  document.getElementById('win').addEventListener('click', async function (e) {
+    var b = e.target.closest ? e.target.closest('button.act') : null;
+    if (!b || b.disabled) return;
+
+    var pid = b.getAttribute('data-pid');
+    var name = b.getAttribute('data-p');
+    var isCurrentlyFrozen = b.getAttribute('aria-pressed') === 'true';
+
+    if (isLive && pid) {
+      var endpoint = isCurrentlyFrozen ? '/api/resume/' + pid : '/api/freeze/' + pid;
+      try {
+        await fetch(API_BASE + endpoint, { method: 'POST' });
+        await fetchLiveStatus();
+      } catch (err) {
+        console.error('Action failed:', err);
+      }
+    } else {
+      // Mock toggle
+      if (mockFrozen[name]) delete mockFrozen[name]; else mockFrozen[name] = true;
+      renderRows();
+    }
+  });
+
+  /* ---------- Live Poller from Backend ---------- */
+  async function fetchLiveStatus() {
+    try {
+      var res = await fetch(API_BASE + '/api/tasks');
+      if (!res.ok) throw new Error('Backend HTTP ' + res.status);
+      var data = await res.json();
+
+      isLive = true;
+      var tag = document.getElementById('connTag');
+      tag.textContent = 'LIVE HOST';
+      tag.className = 'conn-tag live';
+
+      var hint = document.getElementById('winHint');
+      if (hint) hint.textContent = 'Live processes active. Press Freeze to suspend or Resume to continue.';
+
+      // Map external and system apps
+      liveData.ext = (data.external_apps || []).map(function(t) {
+        return { n: t.name, pid: t.pid, mem: t.memory_mb, cpu: t.cpu_percent, is_frozen: t.is_frozen, is_protected: t.is_protected };
+      });
+      liveData.sys = (data.system_apps || []).map(function(t) {
+        return { n: t.name, pid: t.pid, mem: t.memory_mb, cpu: t.cpu_percent, is_frozen: t.is_frozen, is_protected: t.is_protected };
+      });
+
+      // Update Telemetry Header Stats
+      if (data.stats) {
+        document.getElementById('sReclaim').textContent = data.stats.cpu_reclaimed.toFixed(1) + '%';
+        document.getElementById('sHeld').textContent = data.stats.ram_held_fmt || (data.stats.ram_held_mb + ' MB');
+        document.getElementById('sFrozen').textContent = String(data.stats.frozen_count);
+      }
+
+      // Update SJF Queue Chips
+      if (data.queue && data.queue.length > 0) {
+        var qHtml = '<span class="ql">SJF queue</span>' + data.queue.map(function(j) {
+          var isRun = j.status === 'running';
+          return '<span class="chip' + (isRun ? ' run' : '') + '">' + j.name + ' &middot; ' + j.formatted_duration + '</span>';
+        }).join('');
+        document.getElementById('queueChips').innerHTML = qHtml;
+      }
+
+      renderRows();
+    } catch (err) {
+      if (isLive) {
+        isLive = false;
+        var tag = document.getElementById('connTag');
+        tag.textContent = 'PREVIEW MOCK';
+        tag.className = 'conn-tag mock';
+        renderRows();
+      }
+    }
+  }
+
+  // Device & LAN address discovery
+  async function fetchDeviceInfo() {
+    try {
+      var res = await fetch(API_BASE + '/api/device');
+      if (!res.ok) return;
+      var dev = await res.json();
+      if (dev.endpoints && dev.endpoints.lan) {
+        var lanRow = document.getElementById('lanAddrRow');
+        var lanText = document.getElementById('lanAddrText');
+        if (lanRow && lanText) {
+          lanText.textContent = dev.endpoints.lan;
+          lanRow.style.display = 'flex';
+        }
+      }
+      if (dev.endpoints && dev.endpoints.loopback) {
+        var winUrl = document.getElementById('winUrl');
+        var addrText = document.getElementById('addrText');
+        if (winUrl) winUrl.textContent = dev.endpoints.loopback;
+        if (addrText) addrText.textContent = dev.endpoints.loopback;
+      }
+    } catch (e) {}
+  }
+
+  fetchLiveStatus();
+  fetchDeviceInfo();
+  setInterval(fetchLiveStatus, 2000);
+
+  /* ---------- Time Slice Illustration ---------- */
+  var seq = 'FabcFdaFebcFdaFbecFadFbce'.split('');
+  while (seq.length < 28) seq.push('F');
+  seq = seq.slice(0, 28);
+  function strip(id, shareId, after) {
+    var el = document.getElementById(id), f = 0, html = '';
+    seq.forEach(function (s, i) {
+      var isF = s === 'F';
+      if (after && !isF && s !== 'b') { isF = true; }
+      if (isF) f++;
+      var cls = isF ? 'f' : (i % 2 ? 'g1' : 'g2');
+      html += '<span class="' + cls + '"></span>';
+    });
+    el.innerHTML = html;
+    document.getElementById(shareId).innerHTML = 'Foreground share <b>' + Math.round(f / seq.length * 100) + '%</b>';
+  }
+  strip('stripBefore', 'shareBefore', false);
+  strip('stripAfter', 'shareAfter', true);
+
+  /* ---------- Platform Selection & Real Download Engine ---------- */
+  var currentPlatform = 'windows';
+  var platformConfig = {
+    windows: {
+      title: 'ThrottlerOS for Windows',
+      btnLabel: 'Download for Windows (.zip / .vbs installer)',
+      fileDesc: 'ThrottlerOS-1.0.0-win64.zip<br>install.vbs &middot; run.vbs &middot; install.bat &middot; app/ &middot; requirements.txt',
+      os: 'Windows 10 / 11, 64-bit',
+      priv: 'Administrator rights',
+      apiTarget: '/api/download/windows',
+      fileName: 'ThrottlerOS-1.0.0-win64.zip',
+      steps: [
+        'Extract the zip to a folder you keep.',
+        'Right-click <code>install.vbs</code> and choose Open (or run <code>install.bat</code> as Administrator).',
+        'Double-click <code>run.vbs</code>. No console window appears.',
+        'Open <code>http://127.0.0.1:8742</code> in any browser.'
+      ]
+    },
+    linux: {
+      title: 'ThrottlerOS for Linux & Raspberry Pi',
+      btnLabel: 'Download for Linux (.tar.gz / service)',
+      fileDesc: 'ThrottlerOS-1.0.0-linux.tar.gz<br>install.sh &middot; run.sh &middot; throttleros.service &middot; app/ &middot; requirements.txt',
+      os: 'Ubuntu, Debian, Fedora, Arch, Raspberry Pi OS',
+      priv: 'Standard user / root for systemd',
+      apiTarget: '/api/download/linux',
+      fileName: 'ThrottlerOS-1.0.0-linux.tar.gz',
+      steps: [
+        'Extract the archive: <code>tar -xzf ThrottlerOS-1.0.0-linux.tar.gz</code>',
+        'Run installer script: <code>./install.sh</code>',
+        'Start ThrottlerOS: <code>./run.sh</code> (or <code>./run.sh --lan</code>)',
+        'Open <code>http://127.0.0.1:8742</code> in your browser.'
+      ]
+    },
+    macos: {
+      title: 'ThrottlerOS for macOS',
+      btnLabel: 'Download for macOS (.tar.gz)',
+      fileDesc: 'ThrottlerOS-1.0.0-macos.tar.gz<br>install.sh &middot; run.sh &middot; launchd.plist &middot; app/ &middot; requirements.txt',
+      os: 'macOS Monterey, Ventura, Sonoma, Sequoia (M-series / Intel)',
+      priv: 'Standard user rights',
+      apiTarget: '/api/download/macos',
+      fileName: 'ThrottlerOS-1.0.0-macos.tar.gz',
+      steps: [
+        'Extract the archive: <code>tar -xzf ThrottlerOS-1.0.0-macos.tar.gz</code>',
+        'Run installer: <code>./install.sh</code>',
+        'Launch ThrottlerOS: <code>./run.sh</code>',
+        'Open <code>http://127.0.0.1:8742</code> in Safari or Chrome.'
+      ]
+    },
+    source: {
+      title: 'ThrottlerOS Python Module Source',
+      btnLabel: 'Download Full Module (.zip)',
+      fileDesc: 'ThrottlerOS-1.0.0-all.zip<br>pyproject.toml &middot; backend/ &middot; frontend/ &middot; scripts/ &middot; requirements.txt',
+      os: 'Any OS with Python 3.11+',
+      priv: 'Standard user rights',
+      apiTarget: '/api/download/source',
+      fileName: 'ThrottlerOS-1.0.0-all.zip',
+      steps: [
+        'Extract the zip archive.',
+        'Install module: <code>pip install .</code>',
+        'Run command directly: <code>throttleros --port 8742</code>',
+        'Access <code>http://127.0.0.1:8742</code> from any device.'
+      ]
+    }
+  };
+
+  window.selectPlatform = function(plat) {
+    currentPlatform = plat;
+    document.querySelectorAll('.plat-btn').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-plat') === plat);
+    });
+    var cfg = platformConfig[plat] || platformConfig.windows;
+    document.getElementById('dlCardTitle').textContent = cfg.title;
+    document.getElementById('dlLabel').textContent = cfg.btnLabel;
+    document.getElementById('dlFileDesc').innerHTML = cfg.fileDesc;
+    document.getElementById('reqOS').textContent = cfg.os;
+    document.getElementById('reqPriv').textContent = cfg.priv;
+    document.getElementById('dlSteps').innerHTML = cfg.steps.map(function(s) { return '<li>' + s + '</li>'; }).join('');
+  };
+
+  // Auto-detect client OS if possible
+  (function detectOS() {
+    var p = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
+    p = p.toLowerCase();
+    if (p.indexOf('win') !== -1) selectPlatform('windows');
+    else if (p.indexOf('mac') !== -1) selectPlatform('macos');
+    else if (p.indexOf('linux') !== -1) selectPlatform('linux');
+  })();
+
+  var dlBtn = document.getElementById('dlBtn');
+  var dlBar = document.getElementById('dlBar');
+  var dlLabel = document.getElementById('dlLabel');
+  var dlStatus = document.getElementById('dlStatus');
+  var isDownloading = false;
+
+  dlBtn.addEventListener('click', function () {
+    if (isDownloading) return;
+    isDownloading = true;
+
+    var cfg = platformConfig[currentPlatform] || platformConfig.windows;
+    var t0 = performance.now();
+    var dur = reduce ? 400 : 1800;
+
+    dlBtn.disabled = true;
+    dlLabel.textContent = 'Packaging ' + cfg.fileName + '...';
+
+    function tick(now) {
+      var k = Math.min((now - t0) / dur, 1);
+      var e = 1 - Math.pow(1 - k, 2.2);
+      dlBar.style.width = (e * 100).toFixed(1) + '%';
+      dlStatus.textContent = 'Preparing ' + cfg.fileName + '  ' + Math.round(e * 100) + '%';
+
+      if (k < 1) {
+        requestAnimationFrame(tick);
+        return;
+      }
+
+      // Trigger real browser download
+      var downloadUrl = API_BASE + cfg.apiTarget;
+      var a = document.createElement('a');
+      a.href = downloadUrl;
+      a.setAttribute('download', cfg.fileName);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      dlStatus.innerHTML = '<span style="color:var(--ok)">&#x2714; Download initiated: ' + cfg.fileName + '</span><br>' +
+        '<span style="color:var(--muted)">Extract and follow setup instructions on your device.</span>';
+      dlLabel.textContent = 'Download Again';
+      dlBtn.disabled = false;
+      isDownloading = false;
+    }
+    requestAnimationFrame(tick);
+  });
+
+  /* ---------- Copy Address Buttons ---------- */
+  function setupCopy(btnId, textId) {
+    var btn = document.getElementById(btnId);
+    var textEl = document.getElementById(textId);
+    if (!btn || !textEl) return;
+
+    btn.addEventListener('click', function () {
+      try {
+        navigator.clipboard.writeText(textEl.textContent).then(function() {
+          btn.textContent = 'Copied';
+          setTimeout(function() { btn.textContent = 'Copy'; }, 1600);
+        });
+      } catch(e) {}
+    });
+  }
+  setupCopy('copyBtn', 'addrText');
+  setupCopy('copyLanBtn', 'lanAddrText');
+})();
+</script>
+</body>
+</html>
+

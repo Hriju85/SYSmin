@@ -22,3 +22,4 @@ If ret = 0 Then
 Else
     MsgBox "Installation completed with warnings. You can also run scripts\install.bat.", vbExclamation, "ThrottlerOS Setup"
 End If
+

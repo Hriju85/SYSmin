@@ -14,3 +14,4 @@ fi
 
 echo "Starting ThrottlerOS & SYSmin..."
 exec "$PY" -m backend.main --host 127.0.0.1 --port 8742 "$@"
+

@@ -33,3 +33,4 @@ echo "To run locally:            ./scripts/run.sh"
 echo "To allow LAN access:       ./scripts/run.sh --lan"
 echo "Dashboard:                 http://127.0.0.1:8742"
 echo "===================================================="
+
