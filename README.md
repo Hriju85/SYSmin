@@ -1,16 +1,20 @@
 # SYSmin (Local Process Controller & SJF Throttler)
 
-A lightweight Windows utility and process manager designed to monitor active system processes, provide real-time Task Manager telemetry graphs, and selectively throttle background tasks using Shortest-Job-First (SJF) scheduling to optimize CPU performance and reclaim system resources.
+A lightweight utility and process manager designed to monitor active system processes, provide real-time Task Manager telemetry graphs, and selectively throttle background tasks using Shortest-Job-First (SJF) scheduling to optimize CPU performance and reclaim system resources.
 
 ---
 
-## 📂 Project Structure
+## 📂 Streamlined Project Structure
 
 ```text
-processidentifer/
+SYSmin/
+├── run.vbs                   # Unified Windows 1-Click Runner (runs EXE/source, stops, opens browser)
+├── run.sh                    # Unified Linux/macOS Runner (start/stop/open browser)
+├── requirements.txt          # Python dependencies with platform markers
+│
 ├── backend/                  # Backend FastAPI Service
-│   ├── main.py               # API endpoints & static serving
-│   ├── requirements.txt      # Backend Python dependencies
+│   ├── main.py               # API endpoints, SJF daemon & static file serving
+│   ├── requirements.txt      # Backend dependencies
 │   ├── Dockerfile            # Backend container definition
 │   ├── .dockerignore         # Docker ignore rules
 │   └── README.md             # Backend setup & deployment guide
@@ -24,51 +28,46 @@ processidentifer/
 │   ├── .dockerignore         # Docker ignore rules
 │   └── README.md             # Frontend hosting & deployment guide
 │
-├── dist/                     # Standalone Windows executable output
+├── dist/                     # Standalone compiled binary (ProcessController)
+├── scripts/                  # Network & Proxy helper scripts
+│   ├── check_my_ip.ps1
+│   ├── enable_system_proxy.ps1
+│   └── disable_system_proxy.ps1
+│
 ├── docker-compose.yml        # Multi-container deployment (Frontend + Backend)
-├── ProcessController.spec    # PyInstaller specification for Windows bundle
+├── ProcessController.spec    # PyInstaller specification for windowless executable
 ├── build.bat                 # Rebuild script for PyInstaller
-├── run.vbs                   # Silent VBS launcher for Python source
-├── run_exe_silent.vbs        # Silent VBS launcher for Windows executable
-├── requirements.txt          # Root Python dependencies
+├── LICENSE                   # Project license
 └── README.md                 # Project documentation
 ```
 
 ---
 
-## 🚀 Deployment Options
+## 🚀 Quick Start (One Running File Does It All)
 
-### 1. Docker Compose (Full Stack)
-To run both the backend and frontend in containerized environments:
-```bash
-docker compose up --build
-```
-- Frontend UI: `http://localhost:3000`
-- Backend API: `http://localhost:8000`
+### 🪟 Windows Users (`run.vbs`)
+Double-click **`run.vbs`** to do everything:
+1. **Auto-Detects Executable**: If `dist\ProcessController.exe` or `ProcessController.exe` is present, it launches the standalone executable completely silently.
+2. **Auto-Detects Python Environment**: If the executable is not built, it automatically sets up `.venv` and installs `requirements.txt` on first launch, then runs `backend/main.py` hidden using `pythonw.exe`.
+3. **Smart Lifecycle Management**:
+   - If SYSmin is **not running**: starts the server, waits for port 8000, and opens `http://127.0.0.1:8000` in your default browser.
+   - If SYSmin is **already running**: prompts you whether to open the dashboard in your browser or cleanly terminate the background server.
 
-### 2. Standalone Windows Executable (.exe)
-The project is packaged into a single Windows executable bundling Python, dependencies, and frontend:
-- **Direct run**: Double-click `dist\ProcessController.exe`.
-- **Silent background run**: Double-click `run_exe_silent.vbs`.
-- **Rebuilding the executable**: Run `build.bat` or:
-  ```powershell
-  .\.venv\Scripts\pyinstaller.exe --clean ProcessController.spec
+### 🐧 Linux & macOS Users (`run.sh`)
+- **Start the app**:
+  ```bash
+  ./run.sh
   ```
-
-### 3. Decoupled Cloud / Server Deployment
-- **Backend**: Can be deployed independently (e.g., on Render, Fly.io, Railway, AWS ECS, or any Linux VPS) using `backend/Dockerfile` or `pip install -r backend/requirements.txt && python backend/main.py`.
-- **Frontend**: Can be deployed to any static host (Vercel, Netlify, Cloudflare Pages, S3, or Nginx) using `frontend/`. Point the frontend to the backend by setting `window.API_BASE_URL` in `frontend/index.html`.
+- **Stop the app**:
+  ```bash
+  ./run.sh stop
+  ```
 
 ---
 
-## 💻 Local Development Mode
-
-Run directly from source:
-```powershell
-.\.venv\Scripts\python.exe backend\main.py
-```
-Or launch silently without a console window:
+## 📦 Building Standalone Executable (.exe)
+To compile into a single, windowless `.exe`:
 ```cmd
-wscript run_exe_silent.vbs
+build.bat
 ```
->>>>>>> fe0480d (Initial commit: Process Controller & SJF Task Throttler with real-time Task Manager graphs, IP masking, and modular frontend/backend architecture)
+Output executable is saved to `dist/ProcessController.exe`.

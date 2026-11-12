@@ -1,5 +1,18 @@
 import os
 import sys
+
+# Ensure sys.stdout and sys.stderr are valid (prevent NoneType crashes under pythonw.exe)
+if sys.stdout is None:
+    try:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    except Exception:
+        pass
+if sys.stderr is None:
+    try:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+    except Exception:
+        pass
+
 import multiprocessing
 import threading
 import time
@@ -254,10 +267,12 @@ def get_frontend_dir() -> str:
     candidates = [
         os.path.abspath(os.path.join(backend_dir, "..", "frontend")),
         os.path.abspath(os.path.join(backend_dir, "frontend")),
+        os.path.abspath(os.path.join(backend_dir, "..")),
         os.path.abspath(os.path.join(os.getcwd(), "frontend")),
+        os.path.abspath(os.getcwd()),
     ]
     for candidate in candidates:
-        if os.path.exists(candidate):
+        if os.path.exists(os.path.join(candidate, "index.html")):
             return candidate
     return os.path.abspath(os.path.join(backend_dir, "..", "frontend"))
 
@@ -272,6 +287,35 @@ else:
 
 if __name__ == "__main__":
     multiprocessing.freeze_support()
+    import socket
+
+    # Single-instance check: if port 8000 is already active, open browser and exit
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        if s.connect_ex(("127.0.0.1", 8000)) == 0:
+            webbrowser.open("http://127.0.0.1:8000")
+            sys.exit(0)
+    finally:
+        s.close()
+
+    # Track PID in project root for clean management
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    pid_file = os.path.join(root_dir, ".server.pid")
+    try:
+        with open(pid_file, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except Exception:
+        pass
+
+    import atexit
+    def cleanup_pid():
+        try:
+            if os.path.exists(pid_file):
+                os.remove(pid_file)
+        except Exception:
+            pass
+    atexit.register(cleanup_pid)
+
     import uvicorn
     threading.Timer(1.0, lambda: webbrowser.open("http://127.0.0.1:8000")).start()
     uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
