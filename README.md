@@ -69,6 +69,6 @@ Run directly from source:
 ```
 Or launch silently without a console window:
 ```cmd
-wscript run.vbs
+wscript run_exe_silent.vbs
 ```
 >>>>>>> fe0480d (Initial commit: Process Controller & SJF Task Throttler with real-time Task Manager graphs, IP masking, and modular frontend/backend architecture)
