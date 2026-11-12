@@ -2,18 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "trailingSlash": false,
-  "functions": {
-    "api/**/*.py": {
-      "includeFiles": "backend/**",
-      "maxDuration": 15
-    }
-  },
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)\\.zip",
@@ -21,27 +9,6 @@
         {
           "key": "Content-Type",
           "value": "application/zip"
-        },
-        {
-          "key": "Content-Disposition",
-          "value": "attachment"
-        },
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
-      ]
-    },
-    {
-      "source": "/(.*)\\.tar\\.gz",
-      "headers": [
-        {
-          "key": "Content-Type",
-          "value": "application/gzip"
         },
         {
           "key": "Content-Disposition",
@@ -89,4 +56,3 @@
     }
   ]
 }
-
