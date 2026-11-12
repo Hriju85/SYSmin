@@ -3,6 +3,18 @@ import sys
 import argparse
 import socket
 import platform
+
+# Ensure sys.stdout and sys.stderr are valid (prevent NoneType crashes under pythonw.exe)
+if sys.stdout is None:
+    try:
+        sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    except Exception:
+        pass
+if sys.stderr is None:
+    try:
+        sys.stderr = open(os.devnull, "w", encoding="utf-8")
+    except Exception:
+        pass
 import multiprocessing
 import threading
 import time
@@ -347,6 +359,7 @@ def get_privacy_status():
     }
 
 
+
 # ============================================================================
 # Static Files & Frontend Routing
 # ============================================================================
@@ -396,7 +409,7 @@ def run_cli():
 
     parser = argparse.ArgumentParser(description="ThrottlerOS & SYSmin: Localhost Process Throttler")
     parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"), help="Host IP to bind (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8742)), help="Port to listen on (default: 8742)")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 8000)), help="Port to listen on (default: 8742)")
     parser.add_argument("--lan", action="store_true", help="Bind to 0.0.0.0 for access across local network devices")
     parser.add_argument("--no-browser", action="store_true", help="Do not automatically open web browser")
 
@@ -425,4 +438,24 @@ def run_cli():
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
+    # Track PID in project root for clean management
+    root_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    pid_file = os.path.join(root_dir, ".server.pid")
+    try:
+        with open(pid_file, "w", encoding="utf-8") as f:
+            f.write(str(os.getpid()))
+    except Exception:
+        pass
+
+    import atexit
+    def cleanup_pid():
+        try:
+            if os.path.exists(pid_file):
+                os.remove(pid_file)
+        except Exception:
+            pass
+    atexit.register(cleanup_pid)
+
     run_cli()

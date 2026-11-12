@@ -1,5 +1,9 @@
-// Base URL for API requests (supports same-origin and separate deployments)
-const API_BASE = (typeof window !== 'undefined' && window.API_BASE_URL) ? window.API_BASE_URL.replace(/\/+$/, '') : '';
+// Base URL for API requests (supports same-origin, file:// protocol, and separate deployments)
+const API_BASE = (typeof window !== 'undefined' && window.API_BASE_URL)
+    ? window.API_BASE_URL.replace(/\/+$/, '')
+    : (typeof window !== 'undefined' && (window.location.protocol === 'file:' || !window.location.port || window.location.port !== '8000'))
+        ? 'http://127.0.0.1:8000'
+        : '';
 
 // State
 let allTasks = [];
