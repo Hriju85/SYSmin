@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "throttleros"
+version = "1.0.0"
+description = "Localhost Process Throttler & Shortest-Job-First Priority Scheduler"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Hriju85 & ThrottlerOS Contributors" }
+]
+keywords = ["task-manager", "process-throttler", "sjf-scheduler", "cpu-optimization", "performance"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "psutil>=5.9.8",
+]
+
+[project.scripts]
+throttleros = "backend.main:run_cli"
+sysmin = "backend.main:run_cli"
+
+[tool.setuptools]
+packages = ["backend", "sysmin", "throttleros"]
+
+[tool.setuptools.package-data]
+backend = ["../frontend/*", "../frontend/**/*"]

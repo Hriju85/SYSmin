@@ -320,6 +320,12 @@ function renderTableSection(tbodyId, tasks) {
         const memPct = Math.min(100, Math.round((memMb / maxMemBaseline) * 100));
         const isProtected = Boolean(task.is_protected);
 
+        const freezeButton = isProtected
+            ? `<button class="btn-row btn-disabled" disabled title="Protected system process">&#x1F512;</button>`
+            : (task.status === 'SUSPENDED'
+                ? `<button class="btn-row btn-resume" onclick="resumeTask(${task.pid})">Resume</button>`
+                : `<button class="btn-row btn-freeze" onclick="freezeTask(${task.pid})">Freeze</button>`);
+
         const focusButton = `<button class="btn-row btn-focus" onclick="focusTask(${task.pid})">Focus</button>`;
         const killButton = isProtected
             ? `<button class="btn-row btn-kill" disabled title="Protected system process cannot be terminated">End</button>`
@@ -343,6 +349,7 @@ function renderTableSection(tbodyId, tasks) {
                 <td class="col-status ${statusClass}">${statusText}</td>
                 <td class="col-action">
                     <div class="row-actions">
+                        ${freezeButton}
                         ${focusButton}
                         ${killButton}
                     </div>
@@ -378,6 +385,15 @@ function renderTableSection(tbodyId, tasks) {
                 const targetClass = `col-status ${statusClass}`;
                 if (statusCell.className !== targetClass) statusCell.className = targetClass;
                 if (statusCell.textContent !== statusText) statusCell.textContent = statusText;
+            }
+
+            const actionsWrap = row.querySelector('.row-actions');
+            if (actionsWrap) {
+                actionsWrap.innerHTML = `
+                    ${freezeButton}
+                    ${focusButton}
+                    ${killButton}
+                `;
             }
         }
 
@@ -426,6 +442,24 @@ async function killTask(pid, name) {
         console.error('Failed to kill process:', err);
     } finally {
         await refreshTasks();
+    }
+}
+
+async function freezeTask(pid) {
+    try {
+        await fetch(`${API_BASE}/api/freeze/${pid}`, { method: 'POST' });
+        await refreshTasks();
+    } catch (err) {
+        console.error('Failed to freeze task:', err);
+    }
+}
+
+async function resumeTask(pid) {
+    try {
+        await fetch(`${API_BASE}/api/resume/${pid}`, { method: 'POST' });
+        await refreshTasks();
+    } catch (err) {
+        console.error('Failed to resume task:', err);
     }
 }
 

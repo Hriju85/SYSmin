@@ -1,23 +1,14 @@
 version: '3.8'
 
 services:
-  backend:
+  throttleros:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
-    container_name: process-controller-backend
-    ports:
-      - "8000:8000"
+    container_name: throttleros
+    pid: host
+    network_mode: host
     restart: unless-stopped
-
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    container_name: process-controller-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8742

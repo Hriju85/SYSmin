@@ -805,6 +805,38 @@ body {
     background: var(--bg-card-subtle);
 }
 
+.btn-freeze {
+    border-color: #38bdf8;
+    background: rgba(56, 189, 248, 0.1);
+    color: #0284c7;
+    font-weight: 500;
+}
+
+.btn-freeze:hover:not(:disabled) {
+    background: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+.btn-resume {
+    border-color: #38bdf8;
+    background: #38bdf8;
+    color: #04121c;
+    font-weight: 600;
+}
+
+.btn-resume:hover:not(:disabled) {
+    background: #7dd3fc;
+    border-color: #7dd3fc;
+}
+
+.btn-disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f1f5f9;
+    border-color: #e2e8f0;
+}
+
 .btn-focus {
     border-color: var(--orange-200);
     color: var(--orange-700);
