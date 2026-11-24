@@ -165,6 +165,7 @@ def get_tasks():
     return {
         "auto_mode": process_manager.auto_mode,
         "focused_pid": process_manager.focused_pid,
+        "throttled_pids": list(process_manager.throttled_pids),
         "system": telemetry,
         "stats": {
             "cpu_reclaimed": telemetry["cpu_reclaimed"],
@@ -209,10 +210,15 @@ def resume_task(pid: int):
 @app.post("/api/focus/{pid}")
 def focus_task(pid: int):
     """
-    Isolates CPU execution to the targeted process while suspending other user tasks.
+    Prioritizes CPU execution for the targeted process while safely lowering
+    the priority of background heavy tasks without system deadlocks.
     """
     success, msg = process_manager.focus_process(pid)
-    return {"status": "ok" if success else "error", "message": msg, "focused": pid}
+    return {
+        "status": "ok" if success else "error",
+        "message": msg,
+        "focused": process_manager.focused_pid
+    }
 
 
 @app.post("/api/kill/{pid}")

@@ -848,6 +848,19 @@ body {
     border-color: var(--orange-700);
 }
 
+.btn-focus.active {
+    background: var(--orange-600);
+    color: #ffffff;
+    border-color: var(--orange-700);
+    font-weight: 600;
+    box-shadow: 0 0 0 2px rgba(234, 88, 12, 0.25);
+}
+
+.btn-focus.active:hover {
+    background: var(--orange-700);
+    border-color: var(--orange-800);
+}
+
 .btn-kill {
     border-color: #fecaca;
     color: var(--red-600);

@@ -10,29 +10,48 @@ IS_WINDOWS = sys.platform.startswith("win")
 IS_LINUX = sys.platform.startswith("linux")
 IS_MACOS = sys.platform == "darwin"
 
-# Common system processes that must never be frozen or killed
+# Common system and runtime processes that must never be frozen or killed
 SYSTEM_WHITELIST_COMMON = {
-    "system", "registry", "init", "systemd", "kernel_task", "launchd"
+    "system", "registry", "init", "systemd", "kernel_task", "launchd",
+    "python", "python3", "python.exe", "python3.exe"
 }
 
+# Web browsers - must never be frozen or killed (they run the web dashboard!)
+BROWSER_WHITELIST = {
+    "chrome.exe", "msedge.exe", "firefox.exe", "brave.exe", "opera.exe",
+    "vivaldi.exe", "arc.exe", "chromium.exe", "chrome", "msedge",
+    "firefox", "brave", "opera", "vivaldi", "arc", "chromium",
+    "safari", "webkit"
+}
+
+# Windows system, desktop manager, input, audio, and shell processes
 WINDOWS_SYSTEM_WHITELIST = {
     "smss.exe", "csrss.exe", "wininit.exe", "services.exe", "lsass.exe",
     "svchost.exe", "explorer.exe", "dwm.exe", "conhost.exe", "taskhostw.exe",
     "sihost.exe", "runtimebroker.exe", "securityhealthservice.exe",
-    "msmpeng.exe", "spoolsv.exe", "fontdrvhost.exe", "winlogon.exe"
+    "msmpeng.exe", "spoolsv.exe", "fontdrvhost.exe", "winlogon.exe",
+    "ctfmon.exe", "shellexperiencehost.exe", "startmenuexperiencehost.exe",
+    "searchhost.exe", "audiodg.exe", "windowsterminal.exe", "cmd.exe",
+    "powershell.exe", "pwsh.exe", "code.exe"
 }
 
+# Linux system, desktop compositors, audio, and shell daemons
 LINUX_SYSTEM_WHITELIST = {
     "kthreadd", "kworker", "ksoftirqd", "migration", "rcu_sched", "rcu_bh",
     "watchdog", "systemd-journald", "systemd-udevd", "systemd-resolved",
     "systemd-logind", "dbus-daemon", "polkitd", "sshd", "cron", "crond",
     "networkmanager", "pipewire", "wireplumber", "pulseaudio", "xorg",
-    "xwayland", "wayland", "gdm", "lightdm", "sddm", "dockerd", "containerd"
+    "xwayland", "wayland", "gdm", "lightdm", "sddm", "dockerd", "containerd",
+    "gnome-shell", "kwin", "kwin_wayland", "kwin_x11", "mutter", "xfwm4",
+    "mate-session", "plasmashell", "bash", "zsh", "sh", "konsole",
+    "gnome-terminal", "alacritty", "kitty", "code"
 }
 
+# macOS system, UI server, and window services
 MACOS_SYSTEM_WHITELIST = {
     "windowserver", "syslogd", "logd", "diskarbitrationd", "opendirectoryd",
-    "mds", "mds_stores", "coreaudiod", "fseventsd", "powerd"
+    "mds", "mds_stores", "coreaudiod", "fseventsd", "powerd", "finder",
+    "dock", "terminal", "iterm2", "code"
 }
 
 
@@ -44,6 +63,7 @@ class ProcessManager:
 
     def __init__(self):
         self.suspended_pids: Set[int] = set()
+        self.throttled_pids: Set[int] = set()
         self.frozen_meta: Dict[int, dict] = {}
         self.focused_pid: Optional[int] = None
         self.auto_mode: bool = False
@@ -57,6 +77,7 @@ class ProcessManager:
 
     def get_whitelist(self) -> Set[str]:
         wl = set(SYSTEM_WHITELIST_COMMON)
+        wl.update(BROWSER_WHITELIST)
         if IS_WINDOWS:
             wl.update(WINDOWS_SYSTEM_WHITELIST)
         elif IS_LINUX:
@@ -188,7 +209,17 @@ class ProcessManager:
                 rss_mb = round(mem_info.rss / (1024 * 1024), 1) if mem_info else 0.0
 
                 is_frozen = pid in self.suspended_pids
-                status = "SUSPENDED" if is_frozen else "RUNNING"
+                is_throttled = pid in self.throttled_pids
+                is_focused = pid == self.focused_pid
+
+                if is_frozen:
+                    status = "SUSPENDED"
+                elif is_focused:
+                    status = "FOCUSED"
+                elif is_throttled:
+                    status = "THROTTLED"
+                else:
+                    status = "RUNNING"
 
                 # Estimated CPU usage
                 if is_frozen:
@@ -206,6 +237,8 @@ class ProcessManager:
                     "cpu_percent": cpu_pct,
                     "status": status,
                     "is_frozen": is_frozen,
+                    "is_throttled": is_throttled,
+                    "is_focused": is_focused,
                     "is_big": rss_mb > 350 or cpu_pct > 15.0,
                     "category": category,
                     "is_protected": is_protected
@@ -298,40 +331,126 @@ class ProcessManager:
         except Exception as e:
             return False, f"Failed to resume PID {pid}: {str(e)}", {}
 
+    @staticmethod
+    def _set_process_priority(proc: psutil.Process, level: str) -> bool:
+        """
+        Safely configures CPU scheduling priority across Windows, Linux, and macOS.
+        level: 'high', 'below_normal', 'low', or 'normal'
+        """
+        try:
+            if IS_WINDOWS:
+                priority_map = {
+                    "high": getattr(psutil, "HIGH_PRIORITY_CLASS", 0x00000080),
+                    "above_normal": getattr(psutil, "ABOVE_NORMAL_PRIORITY_CLASS", 0x00008000),
+                    "normal": getattr(psutil, "NORMAL_PRIORITY_CLASS", 0x00000020),
+                    "below_normal": getattr(psutil, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000),
+                    "low": getattr(psutil, "IDLE_PRIORITY_CLASS", 0x00000040),
+                }
+                val = priority_map.get(level, getattr(psutil, "NORMAL_PRIORITY_CLASS", 0x00000020))
+                proc.nice(val)
+                return True
+            else:
+                # POSIX nice levels (-20 to 19, 0 is default)
+                if level == "high":
+                    try:
+                        proc.nice(-5)
+                    except (psutil.AccessDenied, PermissionError):
+                        try:
+                            proc.nice(0)
+                        except Exception:
+                            pass
+                elif level in ("below_normal", "low"):
+                    try:
+                        proc.nice(10)
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        proc.nice(0)
+                    except Exception:
+                        pass
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, PermissionError):
+            return False
+        except Exception:
+            return False
+
+    def _restore_priorities(self):
+        """
+        Restores focused and throttled processes back to normal CPU scheduling priority.
+        """
+        if self.focused_pid:
+            try:
+                proc = psutil.Process(self.focused_pid)
+                self._set_process_priority(proc, "normal")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+            self.focused_pid = None
+
+        for t_pid in list(self.throttled_pids):
+            try:
+                proc = psutil.Process(t_pid)
+                self._set_process_priority(proc, "normal")
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+        self.throttled_pids.clear()
+
     def focus_process(self, pid: int) -> Tuple[bool, str]:
         """
-        Isolates execution: resumes target PID and suspends all other non-protected external tasks.
+        Prioritizes CPU execution for the targeted process without freezing the OS.
+        Elevates target PID to HIGH priority and throttles heavy background tasks
+        to BELOW_NORMAL priority. Never suspends browsers, compositors, or input threads.
+        Clicking Focus on an already-focused PID cleanly toggles/unfocuses it.
         """
+        # Toggle: if already focused on this PID, unfocus and restore normal priorities
+        if self.focused_pid == pid:
+            self.resume_all()
+            return True, f"Unfocused PID {pid}. Restored all background tasks to normal priority."
+
+        if pid <= 4 or pid == self._my_pid:
+            return False, "Cannot focus system-critical process or self."
+
+        try:
+            target_proc = psutil.Process(pid)
+            target_name = target_proc.name() or f"Process-{pid}"
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            return False, f"Process with PID {pid} is no longer accessible."
+
+        if self.is_protected_process(pid, target_name):
+            return False, f"Process '{target_name}' (PID {pid}) is a protected system service."
+
+        # Reset any prior focus or throttle state
+        self._restore_priorities()
+
+        # If target process was suspended, resume it
+        if pid in self.suspended_pids:
+            self.resume_process(pid)
+
+        # Elevate target process CPU priority
+        self._set_process_priority(target_proc, "high")
         self.focused_pid = pid
         self.auto_mode = False
 
+        # Throttle heavy background external tasks
         procs = self.scan_processes()
-        target_found = False
+        throttled_count = 0
 
         for p in procs:
             t_pid = p["pid"]
-            if p["is_protected"] or t_pid <= 4:
+            if t_pid == pid or p["is_protected"] or t_pid <= 4 or t_pid == self._my_pid:
                 continue
 
-            try:
-                proc = psutil.Process(t_pid)
-                if t_pid == pid:
-                    target_found = True
-                    proc.resume()
-                    self.suspended_pids.discard(t_pid)
-                    self.frozen_meta.pop(t_pid, None)
-                elif p["category"] == "EXTERNAL_APP":
-                    proc.suspend()
-                    self.suspended_pids.add(t_pid)
-                    self.frozen_meta[t_pid] = {
-                        "name": p["name"],
-                        "memory_mb": p["memory_mb"],
-                        "saved_cpu": max(p.get("cpu_percent", 0.0), 1.5)
-                    }
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                pass
+            # Throttle only heavy non-protected external tasks
+            if p["category"] == "EXTERNAL_APP" and p["is_big"]:
+                try:
+                    bg_proc = psutil.Process(t_pid)
+                    if self._set_process_priority(bg_proc, "below_normal"):
+                        self.throttled_pids.add(t_pid)
+                        throttled_count += 1
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    pass
 
-        return True, f"Focused CPU resources on PID {pid}"
+        return True, f"Focused on '{target_name}' (PID {pid}). Prioritized CPU resources and throttled {throttled_count} heavy background tasks."
 
     def kill_process(self, pid: int) -> Tuple[bool, str]:
         """
@@ -369,12 +488,14 @@ class ProcessManager:
 
     def resume_all(self) -> int:
         """
-        Resumes all currently suspended processes and clears focus/auto state.
+        Resumes all currently suspended processes, restores throttled priorities,
+        and clears focus/auto state.
         """
         self.focused_pid = None
         self.auto_mode = False
-        resumed_count = 0
+        self._restore_priorities()
 
+        resumed_count = 0
         for pid in list(self.suspended_pids):
             try:
                 psutil.Process(pid).resume()

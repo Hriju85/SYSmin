@@ -150,7 +150,10 @@ class SJFScheduler:
             if self.process_manager and self.process_manager.auto_mode and self.process_manager.focused_pid is None:
                 try:
                     procs = self.process_manager.scan_processes()
-                    heavy_tasks = [p for p in procs if p["is_big"] and not p["is_protected"]]
+                    heavy_tasks = [
+                        p for p in procs
+                        if p["category"] == "EXTERNAL_APP" and p["is_big"] and not p["is_protected"]
+                    ]
                     if heavy_tasks:
                         # In auto SJF, execute smallest heavy task first, suspend remainder
                         heavy_tasks.sort(key=lambda x: x["memory_mb"])

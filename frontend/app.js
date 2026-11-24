@@ -11,6 +11,7 @@ let searchQuery = "";
 let currentFilter = "all"; // 'all' | 'external' | 'heavy' | 'suspended'
 let sortField = "memory_mb";
 let sortAsc = false; // Descending by memory by default (like Task Manager)
+let currentFocusedPid = null;
 
 // Real-Time Graph History (60 data points for 60 seconds)
 const HISTORY_LENGTH = 60;
@@ -330,7 +331,10 @@ function renderTableSection(tbodyId, tasks) {
                 ? `<button class="btn-row btn-resume" onclick="resumeTask(${task.pid})">Resume</button>`
                 : `<button class="btn-row btn-freeze" onclick="freezeTask(${task.pid})">Freeze</button>`);
 
-        const focusButton = `<button class="btn-row btn-focus" onclick="focusTask(${task.pid})">Focus</button>`;
+        const isFocused = currentFocusedPid === task.pid;
+        const focusButton = isProtected
+            ? `<button class="btn-row btn-disabled" disabled title="Protected system process cannot be focused">&#x1F512;</button>`
+            : `<button class="btn-row btn-focus ${isFocused ? 'active' : ''}" onclick="focusTask(${task.pid})">${isFocused ? 'Unfocus' : 'Focus'}</button>`;
         const killButton = isProtected
             ? `<button class="btn-row btn-kill" disabled title="Protected system process cannot be terminated">End</button>`
             : `<button class="btn-row btn-kill" onclick="killTask(${task.pid}, '${escapeJs(task.name)}')">End</button>`;
@@ -469,7 +473,11 @@ async function resumeTask(pid) {
 
 async function focusTask(pid) {
     try {
-        await fetch(`${API_BASE}/api/focus/${pid}`, { method: 'POST' });
+        const response = await fetch(`${API_BASE}/api/focus/${pid}`, { method: 'POST' });
+        if (response.ok) {
+            const data = await response.json();
+            currentFocusedPid = data.focused || null;
+        }
         await refreshTasks();
     } catch (err) {
         console.error('Failed to focus task:', err);
@@ -527,13 +535,15 @@ async function refreshTasks() {
         const bannerPill = document.getElementById('statusBannerPill');
         const bannerDesc = document.getElementById('statusBanner');
 
+        currentFocusedPid = data.focused_pid || null;
+
         if (data.focused_pid) {
             if (bannerPill) {
-                bannerPill.textContent = `ISOLATED PID: ${data.focused_pid}`;
+                bannerPill.textContent = `FOCUSED: PID ${data.focused_pid}`;
                 bannerPill.className = 'status-pill status-pill-focus';
             }
             if (bannerDesc) {
-                bannerDesc.textContent = `Process PID ${data.focused_pid} has dedicated CPU execution. Other heavy tasks are suspended.`;
+                bannerDesc.textContent = `Process PID ${data.focused_pid} has high CPU priority. Heavy background tasks are throttled to ensure zero lag.`;
             }
             // Highlight row in tables
             document.querySelectorAll('tr[data-pid]').forEach(r => {
