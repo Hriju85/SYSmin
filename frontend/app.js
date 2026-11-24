@@ -24,13 +24,15 @@ const memHistory = new Array(HISTORY_LENGTH).fill(0);
 function drawTaskManagerGrid(ctx, width, height) {
     ctx.clearRect(0, 0, width, height);
 
-    // Subtle background
-    ctx.fillStyle = '#ffffff';
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+
+    // Theme-aware subtle background
+    ctx.fillStyle = isDark ? '#151d2f' : '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
     // Draw horizontal grid lines (0%, 25%, 50%, 75%, 100%)
     ctx.lineWidth = 1;
-    ctx.strokeStyle = '#e2e8f0';
+    ctx.strokeStyle = isDark ? '#27354f' : '#e2e8f0';
     ctx.setLineDash([2, 4]);
 
     for (let i = 0; i <= 4; i++) {
@@ -584,6 +586,49 @@ window.addEventListener('resize', () => {
     renderTaskManagerGraph('cpuGraphCanvas', cpuHistory, '#16a34a', 'rgba(22, 163, 74, 0.22)');
     renderTaskManagerGraph('memGraphCanvas', memHistory, '#ea580c', 'rgba(234, 88, 12, 0.22)');
 });
+
+// ==========================================================================
+// Theme Management (Light / Dark Mode with Persistence)
+// ==========================================================================
+function initTheme() {
+    const savedTheme = localStorage.getItem('sysmin_theme') || 
+        (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    applyTheme(savedTheme);
+}
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('sysmin_theme', theme);
+
+    const sunIcon = document.getElementById('themeIconSun');
+    const moonIcon = document.getElementById('themeIconMoon');
+    const textEl = document.getElementById('themeToggleText');
+
+    if (theme === 'dark') {
+        if (sunIcon) sunIcon.style.display = 'inline-block';
+        if (moonIcon) moonIcon.style.display = 'none';
+        if (textEl) textEl.textContent = 'Light';
+    } else {
+        if (sunIcon) sunIcon.style.display = 'none';
+        if (moonIcon) moonIcon.style.display = 'inline-block';
+        if (textEl) textEl.textContent = 'Dark';
+    }
+
+    // Refresh canvas graphs with theme-matched grid colors
+    if (typeof cpuHistory !== 'undefined' && typeof memHistory !== 'undefined') {
+        renderTaskManagerGraph('cpuGraphCanvas', cpuHistory, '#16a34a', 'rgba(22, 163, 74, 0.22)');
+        renderTaskManagerGraph('memGraphCanvas', memHistory, '#ea580c', 'rgba(234, 88, 12, 0.22)');
+    }
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+}
+
+// Initialize theme on script evaluation
+initTheme();
 
 // Poll every 1.5 seconds for snappy real-time responsiveness
 setInterval(refreshTasks, 1500);
